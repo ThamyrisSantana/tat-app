@@ -12,6 +12,10 @@ plugins {
 // Local settings come from android/local.properties (never committed):
 //   supabase.url=https://<project>.supabase.co
 //   supabase.anonKey=<anon public key>
+//   release.storeFile=C:/path/to/vendas-release.jks
+//   release.storePassword=...
+//   release.keyAlias=vendas
+//   release.keyPassword=...
 // Without the Supabase settings the app runs in demo mode with sample data.
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
@@ -19,6 +23,8 @@ val localProperties = Properties().apply {
 }
 
 fun buildConfigString(value: String): String = "\"" + value.replace("\"", "\\\"") + "\""
+
+val releaseStoreFile: String? = localProperties.getProperty("release.storeFile")
 
 android {
     namespace = "br.vendas.app"
@@ -47,6 +53,33 @@ android {
             "SUPABASE_ANON_KEY",
             buildConfigString(localProperties.getProperty("supabase.anonKey", "")),
         )
+    }
+
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = localProperties.getProperty("release.storePassword")
+                keyAlias = localProperties.getProperty("release.keyAlias")
+                keyPassword = localProperties.getProperty("release.keyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = if (releaseStoreFile != null) {
+                signingConfigs.getByName("release")
+            } else {
+                // No release key yet: sign with the debug key so the build can be installed
+                // for testing. Create a release key before sharing the app (see README).
+                logger.warn("Release build is signed with the DEBUG key: set release.* in local.properties.")
+                signingConfigs.getByName("debug")
+            }
+        }
     }
 
     compileOptions {
