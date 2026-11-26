@@ -40,6 +40,8 @@ import br.vendas.app.ui.common.AutoLoader
 import br.vendas.app.ui.common.EmptyBox
 import br.vendas.app.ui.common.LoadStateContent
 import br.vendas.app.ui.common.friendlyError
+import br.vendas.app.ui.design.fieldColors
+import br.vendas.app.ui.design.FieldShape
 import br.vendas.app.ui.design.ListRow
 import br.vendas.app.ui.design.Panel
 import br.vendas.app.ui.design.PillTabs
@@ -194,6 +196,8 @@ private fun ProductDialog(
         text = {
             Column {
                 OutlinedTextField(
+                    shape = FieldShape,
+                    colors = fieldColors(),
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Nome") },
@@ -201,6 +205,8 @@ private fun ProductDialog(
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 )
                 OutlinedTextField(
+                    shape = FieldShape,
+                    colors = fieldColors(),
                     value = price,
                     onValueChange = { price = it },
                     label = { Text("Preço (R$)") },

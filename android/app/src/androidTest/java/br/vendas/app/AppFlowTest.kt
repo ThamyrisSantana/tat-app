@@ -55,8 +55,8 @@ class AppFlowTest {
     fun partialPaymentCoversOneInstallmentAndPartOfTheNext() {
         openCustomer("Ana Lima")
         compose.onNodeWithText("Registrar pagamento").performClick()
-        compose.onNodeWithText("Valor recebido (R$)").performTextClearance()
-        compose.onNodeWithText("Valor recebido (R$)").performTextInput("50")
+        compose.onNodeWithText("Valor recebido").performTextClearance()
+        compose.onNodeWithText("Valor recebido").performTextInput("50")
 
         waitForText("Quita a parcela")
         compose.onNodeWithText("Faltarão R$ 35,00").assertIsDisplayed()

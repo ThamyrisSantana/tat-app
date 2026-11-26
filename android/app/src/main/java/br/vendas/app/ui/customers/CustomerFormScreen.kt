@@ -37,6 +37,8 @@ import br.vendas.app.domain.CustomerInput
 import br.vendas.app.domain.PhoneNumbers
 import br.vendas.app.ui.common.LoadingBox
 import br.vendas.app.ui.common.friendlyError
+import br.vendas.app.ui.design.fieldColors
+import br.vendas.app.ui.design.FieldShape
 import br.vendas.app.ui.design.Panel
 import br.vendas.app.ui.design.PrimaryButton
 import br.vendas.app.ui.design.ScreenHeader
@@ -164,6 +166,8 @@ fun CustomerFormScreen(
         ) {
             Panel {
                 OutlinedTextField(
+                    shape = FieldShape,
+                    colors = fieldColors(),
                     value = viewModel.name,
                     onValueChange = { viewModel.name = it },
                     label = { Text("Nome *") },
@@ -174,6 +178,8 @@ fun CustomerFormScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
+                    shape = FieldShape,
+                    colors = fieldColors(),
                     value = viewModel.phone,
                     onValueChange = { viewModel.phone = it },
                     label = { Text("WhatsApp com DDD *") },
@@ -185,6 +191,8 @@ fun CustomerFormScreen(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )
                 OutlinedTextField(
+                    shape = FieldShape,
+                    colors = fieldColors(),
                     value = viewModel.notes,
                     onValueChange = { viewModel.notes = it },
                     label = { Text("Observações") },

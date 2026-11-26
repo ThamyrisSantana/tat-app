@@ -58,6 +58,8 @@ import br.vendas.app.ui.common.ErrorBox
 import br.vendas.app.ui.common.LoadingBox
 import br.vendas.app.ui.common.formatFull
 import br.vendas.app.ui.common.friendlyError
+import br.vendas.app.ui.design.fieldColors
+import br.vendas.app.ui.design.FieldShape
 import br.vendas.app.ui.design.Avatar
 import br.vendas.app.ui.design.ListRow
 import br.vendas.app.ui.design.Panel
@@ -269,6 +271,8 @@ fun NewPurchaseScreen(
                 }
 
                 OutlinedTextField(
+                    shape = FieldShape,
+                    colors = fieldColors(),
                     value = viewModel.notes,
                     onValueChange = { viewModel.notes = it },
                     label = { Text("Observações") },
@@ -400,6 +404,8 @@ private fun ProductPicker(
             if (creatingName == null) {
                 Column {
                     OutlinedTextField(
+                        shape = FieldShape,
+                        colors = fieldColors(),
                         value = query,
                         onValueChange = { query = it },
                         placeholder = { Text("Buscar") },
@@ -442,6 +448,8 @@ private fun ProductPicker(
             } else {
                 Column {
                     OutlinedTextField(
+                        shape = FieldShape,
+                        colors = fieldColors(),
                         value = creatingName,
                         onValueChange = { newProductName = it },
                         label = { Text("Nome") },
@@ -449,6 +457,8 @@ private fun ProductPicker(
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     )
                     OutlinedTextField(
+                        shape = FieldShape,
+                        colors = fieldColors(),
                         value = newProductPrice,
                         onValueChange = { newProductPrice = it },
                         label = { Text("Preço (R$)") },

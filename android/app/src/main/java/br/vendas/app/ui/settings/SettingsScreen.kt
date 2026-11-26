@@ -27,6 +27,8 @@ import br.vendas.app.BuildConfig
 import br.vendas.app.data.SettingsRepository
 import br.vendas.app.data.ShopSettings
 import br.vendas.app.domain.PhoneNumbers
+import br.vendas.app.ui.design.fieldColors
+import br.vendas.app.ui.design.FieldShape
 import br.vendas.app.ui.design.Panel
 import br.vendas.app.ui.design.PrimaryButton
 import br.vendas.app.ui.design.ScreenHeader
@@ -76,6 +78,8 @@ fun SettingsScreen(
             Panel {
                 SectionHeader("Sua loja", subtitle = "Aparece no topo dos comprovantes")
                 OutlinedTextField(
+                    shape = FieldShape,
+                    colors = fieldColors(),
                     value = viewModel.name,
                     onValueChange = { viewModel.name = it },
                     label = { Text("Nome da loja") },
@@ -84,6 +88,8 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 )
                 OutlinedTextField(
+                    shape = FieldShape,
+                    colors = fieldColors(),
                     value = viewModel.phone,
                     onValueChange = { viewModel.phone = it },
                     label = { Text("WhatsApp da loja (opcional)") },

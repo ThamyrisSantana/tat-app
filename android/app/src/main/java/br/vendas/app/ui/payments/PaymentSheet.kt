@@ -33,6 +33,8 @@ import br.vendas.app.domain.PaymentExceedsOpenAmountException
 import br.vendas.app.domain.sum
 import br.vendas.app.ui.common.DateField
 import br.vendas.app.ui.common.formatShort
+import br.vendas.app.ui.design.fieldColors
+import br.vendas.app.ui.design.FieldShape
 import br.vendas.app.ui.design.Panel
 import br.vendas.app.ui.design.PillTabs
 import br.vendas.app.ui.design.PrimaryButton
@@ -155,9 +157,13 @@ fun PaymentSheet(
             }
 
             OutlinedTextField(
+                shape = FieldShape,
+                colors = fieldColors(),
                 value = amountText,
                 onValueChange = { amountText = it },
-                label = { Text("Valor recebido (R$)") },
+                label = { Text("Valor recebido") },
+                prefix = { Text("R$ ", style = MaterialTheme.typography.headlineSmall) },
+                textStyle = MaterialTheme.typography.headlineSmall.copy(color = AppTheme.colors.ink),
                 singleLine = true,
                 isError = amountText.isNotBlank() && amount == null,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -204,6 +210,8 @@ fun PaymentSheet(
             }
 
             OutlinedTextField(
+                shape = FieldShape,
+                colors = fieldColors(),
                 value = notes,
                 onValueChange = { notes = it },
                 label = { Text("Observação (opcional)") },

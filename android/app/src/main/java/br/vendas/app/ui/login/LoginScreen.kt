@@ -27,6 +27,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.vendas.app.data.AuthGateway
 import br.vendas.app.ui.common.friendlyError
+import br.vendas.app.ui.design.fieldColors
+import br.vendas.app.ui.design.FieldShape
 import br.vendas.app.ui.design.PrimaryButton
 import br.vendas.app.ui.theme.AppTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -79,6 +81,8 @@ fun LoginScreen(viewModel: LoginViewModel = hiltViewModel()) {
                 modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
             )
             OutlinedTextField(
+                shape = FieldShape,
+                colors = fieldColors(),
                 state = viewModel.email,
                 label = { Text("E-mail") },
                 lineLimits = TextFieldLineLimits.SingleLine,
@@ -86,6 +90,8 @@ fun LoginScreen(viewModel: LoginViewModel = hiltViewModel()) {
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedSecureTextField(
+                shape = FieldShape,
+                colors = fieldColors(),
                 state = viewModel.password,
                 label = { Text("Senha") },
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),

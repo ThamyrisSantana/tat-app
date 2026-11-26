@@ -36,7 +36,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +54,24 @@ import br.vendas.app.ui.theme.AppTheme
 
 val CardShape = RoundedCornerShape(24.dp)
 val PillShape = RoundedCornerShape(50)
+val FieldShape = RoundedCornerShape(16.dp)
+
+/** Text fields sit on a white card with a clear border, so they stand out on the warm canvas. */
+@Composable
+fun fieldColors(): TextFieldColors {
+    val colors = AppTheme.colors
+    return OutlinedTextFieldDefaults.colors(
+        focusedContainerColor = colors.card,
+        unfocusedContainerColor = colors.card,
+        disabledContainerColor = colors.card,
+        errorContainerColor = colors.card,
+        focusedBorderColor = colors.ink,
+        unfocusedBorderColor = colors.faint,
+        focusedLabelColor = colors.ink,
+        unfocusedLabelColor = colors.muted,
+        cursorColor = colors.ink,
+    )
+}
 
 /** Page title area: optional back button, big title, subtitle and actions on the right. */
 @Composable

@@ -18,7 +18,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -49,6 +48,7 @@ import br.vendas.app.ui.common.formatShort
 import br.vendas.app.ui.design.AccentStrip
 import br.vendas.app.ui.design.Avatar
 import br.vendas.app.ui.design.CardShape
+import br.vendas.app.ui.design.fieldColors
 import br.vendas.app.ui.design.ListRow
 import br.vendas.app.ui.design.OverdueAlert
 import br.vendas.app.ui.design.Panel
@@ -153,11 +153,7 @@ fun CustomerListScreen(
                                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                                 singleLine = true,
                                 shape = CardShape,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    unfocusedContainerColor = AppTheme.colors.card,
-                                    focusedContainerColor = AppTheme.colors.card,
-                                    unfocusedBorderColor = AppTheme.colors.cardBorder,
-                                ),
+                                colors = fieldColors(),
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
