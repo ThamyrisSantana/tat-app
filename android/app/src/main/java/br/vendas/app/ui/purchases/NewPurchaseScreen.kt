@@ -3,6 +3,7 @@ package br.vendas.app.ui.purchases
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,16 +20,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,7 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -48,9 +42,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
-import br.vendas.app.ui.navigation.NewPurchaseRoute
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import br.vendas.app.data.SalesRepository
 import br.vendas.app.domain.Customer
 import br.vendas.app.domain.InstallmentPlan
@@ -61,15 +52,26 @@ import br.vendas.app.domain.PlannedInstallment
 import br.vendas.app.domain.Product
 import br.vendas.app.domain.sum
 import br.vendas.app.domain.today
-import br.vendas.app.ui.common.BackTopBar
 import br.vendas.app.ui.common.DateField
 import br.vendas.app.ui.common.ErrorBox
 import br.vendas.app.ui.common.LoadingBox
-import br.vendas.app.ui.common.SectionTitle
 import br.vendas.app.ui.common.formatFull
 import br.vendas.app.ui.common.friendlyError
+import br.vendas.app.ui.design.Avatar
+import br.vendas.app.ui.design.ListRow
+import br.vendas.app.ui.design.Panel
+import br.vendas.app.ui.design.PillTabs
+import br.vendas.app.ui.design.PrimaryButton
+import br.vendas.app.ui.design.RowDivider
+import br.vendas.app.ui.design.ScreenHeader
+import br.vendas.app.ui.design.SecondaryButton
+import br.vendas.app.ui.design.SectionHeader
+import br.vendas.app.ui.navigation.NewPurchaseRoute
+import br.vendas.app.ui.theme.AppTheme
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import javax.inject.Inject
 
 data class CartItem(val product: Product, val quantity: Int) {
     val subtotal: Money get() = product.price * quantity
@@ -178,59 +180,64 @@ fun NewPurchaseScreen(
 
     LaunchedEffect(viewModel.saved) { if (viewModel.saved) onSaved() }
 
-    Scaffold(topBar = { BackTopBar("Nova compra", onBack) }) { padding ->
+    Column(Modifier.fillMaxSize()) {
         val customer = viewModel.customer
+        ScreenHeader("Nova compra", subtitle = customer?.name, onBack = onBack)
         when {
-            viewModel.loadError != null -> ErrorBox(viewModel.loadError!!, viewModel::load, Modifier.padding(padding))
-            customer == null -> LoadingBox(Modifier.padding(padding))
+            viewModel.loadError != null -> ErrorBox(viewModel.loadError!!, viewModel::load)
+            customer == null -> LoadingBox()
             else -> Column(
                 Modifier
                     .fillMaxSize()
-                    .padding(padding)
                     .imePadding()
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Cliente", style = MaterialTheme.typography.labelLarge)
-                Text(customer.name, style = MaterialTheme.typography.titleLarge)
-
-                DateField(
-                    label = "Data da compra",
-                    date = viewModel.purchaseDate,
-                    onDateChange = { viewModel.purchaseDate = it },
-                    modifier = Modifier.padding(top = 16.dp),
-                )
-
-                SectionTitle("Produtos")
-                viewModel.cart.forEach { item -> CartRow(item, viewModel::changeQuantity) }
-                OutlinedButton(onClick = { picking = true }, modifier = Modifier.padding(top = 4.dp)) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Text("Adicionar produto", modifier = Modifier.padding(start = 8.dp))
-                }
-                Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Total", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    Text(
-                        viewModel.total.format(),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
+                Panel {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Avatar(customer.name)
+                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                            Text("Cliente", style = MaterialTheme.typography.labelLarge, color = AppTheme.colors.muted)
+                            Text(customer.name, style = MaterialTheme.typography.titleMedium, color = AppTheme.colors.ink)
+                        }
+                    }
+                    DateField(
+                        label = "Data da compra",
+                        date = viewModel.purchaseDate,
+                        onDateChange = { viewModel.purchaseDate = it },
+                        modifier = Modifier.padding(top = 16.dp),
                     )
                 }
 
-                SectionTitle("Pagamento")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = !viewModel.onInstallments,
-                        onClick = { viewModel.onInstallments = false },
-                        label = { Text("À vista") },
+                Panel(contentPadding = PaddingValues(vertical = 16.dp)) {
+                    SectionHeader("Produtos", modifier = Modifier.padding(horizontal = 20.dp))
+                    viewModel.cart.forEachIndexed { index, item ->
+                        if (index > 0) RowDivider(Modifier.padding(horizontal = 16.dp))
+                        CartRow(item, viewModel::changeQuantity)
+                    }
+                    SecondaryButton(
+                        "Adicionar produto",
+                        onClick = { picking = true },
+                        icon = Icons.Filled.Add,
+                        modifier = Modifier.padding(start = 16.dp, top = 8.dp),
                     )
-                    FilterChip(
+                    RowDivider(Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Total", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        Text(viewModel.total.format(), style = MaterialTheme.typography.headlineSmall, color = AppTheme.colors.ink)
+                    }
+                }
+
+                Panel {
+                    SectionHeader("Pagamento")
+                    PillTabs(
+                        options = listOf(false to "À vista", true to "A prazo"),
                         selected = viewModel.onInstallments,
-                        onClick = { viewModel.onInstallments = true },
-                        label = { Text("A prazo") },
+                        onSelect = { viewModel.onInstallments = it },
+                        modifier = Modifier.padding(top = 12.dp),
                     )
-                }
-                if (viewModel.onInstallments) {
-                    InstallmentOptions(viewModel)
+                    if (viewModel.onInstallments) InstallmentOptions(viewModel)
                 }
 
                 OutlinedTextField(
@@ -238,16 +245,15 @@ fun NewPurchaseScreen(
                     onValueChange = { viewModel.notes = it },
                     label = { Text("Observações") },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                viewModel.saveError?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 12.dp))
-                }
-                Button(
+                viewModel.saveError?.let { Text(it, color = AppTheme.colors.dangerText) }
+                PrimaryButton(
+                    text = "Salvar compra",
                     onClick = viewModel::save,
                     enabled = !viewModel.saving,
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                ) { Text("Salvar compra") }
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }
@@ -266,36 +272,32 @@ fun NewPurchaseScreen(
 
 @Composable
 private fun CartRow(item: CartItem, onChange: (CartItem, Int) -> Unit) {
-    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(item.product.name, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "${item.product.price.format()} cada · ${item.subtotal.format()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+    ListRow(
+        title = item.product.name,
+        subtitle = "${item.product.price.format()} cada · ${item.subtotal.format()}",
+        trailing = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { onChange(item, -1) }) { Text("−", style = MaterialTheme.typography.titleLarge, color = AppTheme.colors.ink) }
+                Text("${item.quantity}", style = MaterialTheme.typography.titleMedium, color = AppTheme.colors.ink)
+                TextButton(onClick = { onChange(item, +1) }) { Text("+", style = MaterialTheme.typography.titleLarge, color = AppTheme.colors.ink) }
             }
-            TextButton(onClick = { onChange(item, -1) }) { Text("−", style = MaterialTheme.typography.titleLarge) }
-            Text("${item.quantity}", style = MaterialTheme.typography.titleMedium)
-            TextButton(onClick = { onChange(item, +1) }) { Text("+", style = MaterialTheme.typography.titleLarge) }
-        }
-    }
+        },
+    )
 }
 
 @Composable
 private fun InstallmentOptions(viewModel: NewPurchaseViewModel) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
-        Text("Parcelas", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text("Parcelas", style = MaterialTheme.typography.bodyLarge, color = AppTheme.colors.ink, modifier = Modifier.weight(1f))
         TextButton(
             onClick = { viewModel.installmentCount-- },
             enabled = viewModel.installmentCount > InstallmentPlan.MIN_INSTALLMENTS,
-        ) { Text("−", style = MaterialTheme.typography.titleLarge) }
-        Text("${viewModel.installmentCount}x", style = MaterialTheme.typography.titleMedium)
+        ) { Text("−", style = MaterialTheme.typography.titleLarge, color = AppTheme.colors.ink) }
+        Text("${viewModel.installmentCount}x", style = MaterialTheme.typography.titleMedium, color = AppTheme.colors.ink)
         TextButton(
             onClick = { viewModel.installmentCount++ },
             enabled = viewModel.installmentCount < InstallmentPlan.MAX_INSTALLMENTS,
-        ) { Text("+", style = MaterialTheme.typography.titleLarge) }
+        ) { Text("+", style = MaterialTheme.typography.titleLarge, color = AppTheme.colors.ink) }
     }
     DateField(
         label = "1º vencimento",
@@ -305,15 +307,13 @@ private fun InstallmentOptions(viewModel: NewPurchaseViewModel) {
     )
     val plan = viewModel.plan
     if (plan.isNotEmpty()) {
-        Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
-            Column(Modifier.padding(12.dp)) {
-                Text("Simulação", style = MaterialTheme.typography.labelLarge)
-                plan.forEach {
-                    Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                        Text("${it.number}/${plan.size}", modifier = Modifier.weight(0.6f))
-                        Text(it.dueDate.formatFull(), modifier = Modifier.weight(1.2f))
-                        Text(it.amount.format())
-                    }
+        Column(Modifier.padding(top = 16.dp)) {
+            Text("Simulação", style = MaterialTheme.typography.labelLarge, color = AppTheme.colors.muted)
+            plan.forEach {
+                Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                    Text("${it.number}/${plan.size}", color = AppTheme.colors.muted, modifier = Modifier.weight(0.6f))
+                    Text(it.dueDate.formatFull(), color = AppTheme.colors.ink, modifier = Modifier.weight(1.2f))
+                    Text(it.amount.format(), color = AppTheme.colors.ink)
                 }
             }
         }
@@ -326,6 +326,7 @@ private fun ProductPicker(products: List<Product>, onPick: (Product) -> Unit, on
     val visible = products.filter { it.name.contains(query.trim(), ignoreCase = true) }
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = AppTheme.colors.card,
         title = { Text("Escolha o produto") },
         text = {
             Column {
@@ -342,25 +343,20 @@ private fun ProductPicker(products: List<Product>, onPick: (Product) -> Unit, on
                     singleLine = true,
                 )
                 if (products.isEmpty()) {
-                    Text(
-                        "Nenhum produto cadastrado. Cadastre na aba Produtos.",
-                        modifier = Modifier.padding(top = 16.dp),
-                    )
+                    Text("Nenhum produto cadastrado. Cadastre na aba Produtos.", modifier = Modifier.padding(top = 16.dp))
                 }
                 LazyColumn(Modifier.heightIn(max = 360.dp).padding(top = 8.dp)) {
                     items(visible, key = { it.id }) { product ->
-                        Row(
-                            Modifier.fillMaxWidth().clickable { onPick(product) }.padding(vertical = 12.dp),
-                        ) {
-                            Text(product.name, modifier = Modifier.weight(1f))
-                            Text(product.price.format())
+                        Row(Modifier.fillMaxWidth().clickable { onPick(product) }.padding(vertical = 14.dp)) {
+                            Text(product.name, color = AppTheme.colors.ink, modifier = Modifier.weight(1f))
+                            Text(product.price.format(), color = AppTheme.colors.ink)
                         }
-                        HorizontalDivider()
+                        RowDivider()
                     }
                 }
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Fechar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Fechar", color = AppTheme.colors.ink) } },
     )
 }

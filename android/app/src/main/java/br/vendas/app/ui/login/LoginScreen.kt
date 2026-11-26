@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.OutlinedTextField
@@ -29,6 +27,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.vendas.app.data.AuthGateway
 import br.vendas.app.ui.common.friendlyError
+import br.vendas.app.ui.design.PrimaryButton
+import br.vendas.app.ui.theme.AppTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -65,7 +65,7 @@ class LoginViewModel @Inject constructor(private val auth: AuthGateway) : ViewMo
 
 @Composable
 fun LoginScreen(viewModel: LoginViewModel = hiltViewModel()) {
-    Scaffold { padding ->
+    Scaffold(containerColor = AppTheme.colors.canvas) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).padding(24.dp).imePadding(),
             verticalArrangement = Arrangement.Center,
@@ -93,13 +93,12 @@ fun LoginScreen(viewModel: LoginViewModel = hiltViewModel()) {
             viewModel.error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 12.dp))
             }
-            Button(
+            PrimaryButton(
+                text = if (viewModel.busy) "Entrando..." else "Entrar",
                 onClick = viewModel::submit,
                 enabled = !viewModel.busy,
                 modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-            ) {
-                if (viewModel.busy) CircularProgressIndicator(Modifier.padding(2.dp)) else Text("Entrar")
-            }
+            )
         }
     }
 }

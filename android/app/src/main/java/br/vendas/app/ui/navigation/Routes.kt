@@ -5,13 +5,23 @@ import kotlinx.serialization.Serializable
 // Type-safe destinations: the compiler checks every argument a screen needs.
 
 @Serializable
-data object CustomersRoute
+data object DashboardRoute
+
+/** [overdueOnly] opens the list already filtered to late customers. */
+@Serializable
+data class CustomersRoute(val overdueOnly: Boolean = false)
+
+@Serializable
+data object ReceivablesRoute
+
+@Serializable
+data object ReportsRoute
 
 @Serializable
 data object ProductsRoute
 
 @Serializable
-data object SummaryRoute
+data object SettingsRoute
 
 @Serializable
 data class CustomerRoute(val customerId: String)
@@ -25,3 +35,6 @@ data class NewPurchaseRoute(val customerId: String)
 
 @Serializable
 data class PurchaseRoute(val purchaseId: String)
+
+@Serializable
+data class ReceiptRoute(val purchaseId: String)

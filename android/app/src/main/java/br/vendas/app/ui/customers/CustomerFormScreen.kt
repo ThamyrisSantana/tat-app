@@ -9,11 +9,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,9 +35,12 @@ import br.vendas.app.data.DuplicatePhoneException
 import br.vendas.app.data.SalesRepository
 import br.vendas.app.domain.CustomerInput
 import br.vendas.app.domain.PhoneNumbers
-import br.vendas.app.ui.common.BackTopBar
 import br.vendas.app.ui.common.LoadingBox
 import br.vendas.app.ui.common.friendlyError
+import br.vendas.app.ui.design.Panel
+import br.vendas.app.ui.design.PrimaryButton
+import br.vendas.app.ui.design.ScreenHeader
+import br.vendas.app.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -145,64 +145,69 @@ fun CustomerFormScreen(
         }
     }
 
-    Scaffold(
-        topBar = { BackTopBar(if (customerId == null) "Novo cliente" else "Editar cliente", onBack) },
-    ) { padding ->
+    Column(Modifier.fillMaxSize()) {
+        ScreenHeader(
+            if (customerId == null) "Novo cliente" else "Editar cliente",
+            subtitle = "Nome e WhatsApp são obrigatórios",
+            onBack = onBack,
+        )
         if (viewModel.loading) {
-            LoadingBox(Modifier.padding(padding))
-            return@Scaffold
+            LoadingBox()
+            return@Column
         }
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
         ) {
-            OutlinedTextField(
-                value = viewModel.name,
-                onValueChange = { viewModel.name = it },
-                label = { Text("Nome *") },
-                isError = viewModel.nameError != null,
-                supportingText = viewModel.nameError?.let { { Text(it) } },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = viewModel.phone,
-                onValueChange = { viewModel.phone = it },
-                label = { Text("WhatsApp com DDD *") },
-                placeholder = { Text("11 99999-8888") },
-                isError = viewModel.phoneError != null,
-                supportingText = viewModel.phoneError?.let { { Text(it) } },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            )
-            OutlinedTextField(
-                value = viewModel.notes,
-                onValueChange = { viewModel.notes = it },
-                label = { Text("Observações") },
-                minLines = 2,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            )
+            Panel {
+                OutlinedTextField(
+                    value = viewModel.name,
+                    onValueChange = { viewModel.name = it },
+                    label = { Text("Nome *") },
+                    isError = viewModel.nameError != null,
+                    supportingText = viewModel.nameError?.let { { Text(it) } },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = viewModel.phone,
+                    onValueChange = { viewModel.phone = it },
+                    label = { Text("WhatsApp com DDD *") },
+                    placeholder = { Text("11 99999-8888") },
+                    isError = viewModel.phoneError != null,
+                    supportingText = viewModel.phoneError?.let { { Text(it) } },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+                OutlinedTextField(
+                    value = viewModel.notes,
+                    onValueChange = { viewModel.notes = it },
+                    label = { Text("Observações") },
+                    minLines = 2,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+            }
             viewModel.generalError?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 12.dp))
             }
-            Button(
+            PrimaryButton(
+                text = "Salvar",
                 onClick = viewModel::save,
                 enabled = !viewModel.saving,
                 modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-            ) { Text("Salvar") }
+            )
             if (customerId != null) {
-                OutlinedButton(
+                TextButton(
                     onClick = { confirmRemove = true },
                     enabled = !viewModel.saving,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                ) { Text("Remover cliente") }
+                ) { Text("Remover cliente", color = AppTheme.colors.dangerText) }
             }
         }
     }
