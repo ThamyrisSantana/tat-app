@@ -17,9 +17,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -264,8 +266,14 @@ private fun MainNavigation(root: RootViewModel) {
 
             val showNavBar = TOP_LEVEL.any { destination.isOn(it.routeClass) } &&
                 !(destination.isOn(CustomersRoute::class) && backStack?.toRoute<CustomersRoute>()?.overdueOnly == true)
-            // Bottom of the screen, from top to bottom: messages, navigation bar.
+            // Bottom of the screen, from top to bottom: "Nova venda" (home only), messages, navigation bar.
             Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+                if (destination.isOn(DashboardRoute::class)) {
+                    NewSaleButton(
+                        onClick = { navController.navigate(NewPurchaseRoute()) },
+                        modifier = Modifier.align(Alignment.End).padding(end = 16.dp),
+                    )
+                }
                 SnackbarHost(snackbarHostState) { data ->
                     Snackbar(
                         snackbarData = data,
@@ -298,6 +306,20 @@ private inline fun <reified T : Any> NavGraphBuilder.screen(
 }
 
 private fun NavDestination?.isOn(route: KClass<*>): Boolean = this?.hasRoute(route) == true
+
+/** The most frequent task, always at hand on the home screen. */
+@Composable
+private fun NewSaleButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    ExtendedFloatingActionButton(
+        onClick = onClick,
+        icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+        text = { Text("Nova venda", style = MaterialTheme.typography.labelLarge) },
+        shape = PillShape,
+        containerColor = AppTheme.colors.inverseCard,
+        contentColor = AppTheme.colors.onInverseCard,
+        modifier = modifier,
+    )
+}
 
 /** Dark floating bar; the current section is a light pill with its name. */
 @Composable

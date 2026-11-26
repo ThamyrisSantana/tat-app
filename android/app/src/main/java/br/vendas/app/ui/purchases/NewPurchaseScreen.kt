@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -32,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,10 +47,13 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import br.vendas.app.data.SalesRepository
 import br.vendas.app.domain.Customer
+import br.vendas.app.domain.CustomerBalance
+import br.vendas.app.domain.CustomerInput
 import br.vendas.app.domain.InstallmentPlan
 import br.vendas.app.domain.Money
 import br.vendas.app.domain.NewPurchase
 import br.vendas.app.domain.NewPurchaseItem
+import br.vendas.app.domain.PhoneNumbers
 import br.vendas.app.domain.PlannedInstallment
 import br.vendas.app.domain.Product
 import br.vendas.app.domain.sum
@@ -56,6 +61,8 @@ import br.vendas.app.domain.today
 import br.vendas.app.ui.common.DateField
 import br.vendas.app.ui.common.ErrorBox
 import br.vendas.app.ui.common.LoadingBox
+import br.vendas.app.ui.common.UserMessage
+import br.vendas.app.ui.common.UserMessages
 import br.vendas.app.ui.common.formatFull
 import br.vendas.app.ui.common.friendlyError
 import br.vendas.app.ui.design.fieldColors
@@ -83,12 +90,22 @@ data class CartItem(val product: Product, val quantity: Int) {
 @HiltViewModel
 class NewPurchaseViewModel @Inject constructor(
     private val repository: SalesRepository,
+    private val messages: UserMessages,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    private val customerId = savedStateHandle.toRoute<NewPurchaseRoute>().customerId
+    private val initialCustomerId = savedStateHandle.toRoute<NewPurchaseRoute>().customerId
+
+    /** True when the sale started without a customer (from the home screen): the customer is picked here. */
+    val canChangeCustomer = initialCustomerId == null
 
     var customer by mutableStateOf<Customer?>(null)
+        private set
+    /** Customers to pick from, when [canChangeCustomer]. */
+    var customers by mutableStateOf<List<CustomerBalance>>(emptyList())
+        private set
     var products by mutableStateOf<List<Product>>(emptyList())
+    var loading by mutableStateOf(true)
+        private set
     var loadError by mutableStateOf<String?>(null)
 
     val cart = mutableStateListOf<CartItem>()
@@ -121,14 +138,58 @@ class NewPurchaseViewModel @Inject constructor(
 
     fun load() {
         loadError = null
+        loading = true
         viewModelScope.launch {
             try {
-                customer = repository.customer(customerId)
+                if (initialCustomerId != null) {
+                    customer = repository.customer(initialCustomerId)
+                } else {
+                    customers = repository.customerBalances().sortedBy { it.name.lowercase() }
+                }
                 products = repository.products()
             } catch (e: Exception) {
                 loadError = friendlyError(e)
+            } finally {
+                loading = false
             }
         }
+    }
+
+    fun selectCustomer(balance: CustomerBalance) {
+        customer = Customer(balance.customerId, balance.name, balance.phone, notes = null)
+    }
+
+    var creatingCustomer by mutableStateOf(false)
+        private set
+    var createCustomerError by mutableStateOf<String?>(null)
+        private set
+
+    /** Registers a customer from the picker and picks them; [onDone] closes the picker. */
+    fun createCustomerAndSelect(name: String, phone: String, onDone: () -> Unit) {
+        val normalizedPhone = PhoneNumbers.normalize(phone)
+        createCustomerError = when {
+            name.isBlank() -> "Informe o nome."
+            normalizedPhone == null -> "Número inválido. Use DDD + número, ex.: 11 99999-8888."
+            else -> null
+        }
+        if (createCustomerError != null || normalizedPhone == null) return
+        creatingCustomer = true
+        viewModelScope.launch {
+            try {
+                val created = repository.createCustomer(CustomerInput(name.trim(), normalizedPhone, notes = null))
+                customer = created
+                customers = repository.customerBalances().sortedBy { it.name.lowercase() }
+                onDone()
+            } catch (e: Exception) {
+                createCustomerError = friendlyError(e)
+            } finally {
+                creatingCustomer = false
+            }
+        }
+    }
+
+    fun clearCreateCustomerError() {
+        createCustomerError = null
     }
 
     fun add(product: Product) {
@@ -170,24 +231,35 @@ class NewPurchaseViewModel @Inject constructor(
     }
 
     fun save() {
+        val customer = customer
         saveError = when {
+            customer == null -> "Escolha o cliente."
             cart.isEmpty() -> "Adicione pelo menos um produto."
             onInstallments && total.cents < installmentCount -> "Valor baixo demais para $installmentCount parcelas."
             onInstallments && firstDueDate.isBefore(purchaseDate) -> "O 1º vencimento não pode ser antes da compra."
             else -> null
         }
-        if (saveError != null) return
+        if (saveError != null || customer == null) return
         saving = true
+        val total = total
         viewModelScope.launch {
             try {
-                repository.createPurchase(
+                val purchaseId = repository.createPurchase(
                     NewPurchase(
-                        customerId = customerId,
+                        customerId = customer.id,
                         items = cart.map { NewPurchaseItem(it.product.id, it.quantity) },
                         installmentCount = if (onInstallments) installmentCount else 1,
                         purchaseDate = purchaseDate,
                         firstDueDate = if (onInstallments) firstDueDate else null,
                         notes = notes.trim().ifEmpty { null },
+                    ),
+                )
+                // Undoing cancels the sale: it stays in the customer's history as canceled.
+                messages.show(
+                    UserMessage(
+                        text = "Venda de ${total.format()} registrada.",
+                        undoneText = "Venda cancelada.",
+                        undo = { repository.cancelPurchase(purchaseId) },
                     ),
                 )
                 saved = true
@@ -207,15 +279,24 @@ fun NewPurchaseScreen(
     viewModel: NewPurchaseViewModel = hiltViewModel(),
 ) {
     var picking by remember { mutableStateOf(false) }
+    var pickingCustomer by remember { mutableStateOf(false) }
+    // A sale started from the home screen opens the customer picker once, right away.
+    var askedForCustomer by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(viewModel.saved) { if (viewModel.saved) onSaved() }
+    LaunchedEffect(viewModel.loading) {
+        if (!viewModel.loading && viewModel.canChangeCustomer && viewModel.customer == null && !askedForCustomer) {
+            askedForCustomer = true
+            pickingCustomer = true
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         val customer = viewModel.customer
-        ScreenHeader("Nova compra", subtitle = customer?.name, onBack = onBack)
+        ScreenHeader("Nova venda", subtitle = customer?.name, onBack = onBack)
         when {
             viewModel.loadError != null -> ErrorBox(viewModel.loadError!!, viewModel::load)
-            customer == null -> LoadingBox()
+            viewModel.loading -> LoadingBox()
             else -> Column(
                 Modifier
                     .fillMaxSize()
@@ -225,11 +306,24 @@ fun NewPurchaseScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Panel {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(customer.name)
-                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                            Text("Cliente", style = MaterialTheme.typography.labelLarge, color = AppTheme.colors.muted)
-                            Text(customer.name, style = MaterialTheme.typography.titleMedium, color = AppTheme.colors.ink)
+                    if (customer == null) {
+                        Text("Cliente", style = MaterialTheme.typography.labelLarge, color = AppTheme.colors.muted)
+                        PrimaryButton(
+                            "Escolher cliente",
+                            onClick = { pickingCustomer = true },
+                            icon = Icons.Filled.Person,
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Avatar(customer.name)
+                            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                                Text("Cliente", style = MaterialTheme.typography.labelLarge, color = AppTheme.colors.muted)
+                                Text(customer.name, style = MaterialTheme.typography.titleMedium, color = AppTheme.colors.ink)
+                            }
+                            if (viewModel.canChangeCustomer) {
+                                TextButton(onClick = { pickingCustomer = true }) { Text("Trocar", color = AppTheme.colors.ink) }
+                            }
                         }
                     }
                     DateField(
@@ -281,7 +375,7 @@ fun NewPurchaseScreen(
                 )
                 viewModel.saveError?.let { Text(it, color = AppTheme.colors.dangerText) }
                 PrimaryButton(
-                    text = "Salvar compra",
+                    text = "Salvar venda",
                     onClick = viewModel::save,
                     enabled = !viewModel.saving,
                     modifier = Modifier.fillMaxWidth(),
@@ -304,6 +398,172 @@ fun NewPurchaseScreen(
             onDismiss = { picking = false },
         )
     }
+
+    if (pickingCustomer) {
+        CustomerPicker(
+            customers = viewModel.customers,
+            onPick = {
+                viewModel.selectCustomer(it)
+                pickingCustomer = false
+            },
+            creating = viewModel.creatingCustomer,
+            createError = viewModel.createCustomerError,
+            onCreate = { name, phone -> viewModel.createCustomerAndSelect(name, phone) { pickingCustomer = false } },
+            onClearCreateError = viewModel::clearCreateCustomerError,
+            onDismiss = { pickingCustomer = false },
+        )
+    }
+}
+
+/**
+ * Lets the user pick who is buying by name or number or, when the customer
+ * is not registered yet, register them right here (name and WhatsApp).
+ */
+@Composable
+private fun CustomerPicker(
+    customers: List<CustomerBalance>,
+    onPick: (CustomerBalance) -> Unit,
+    creating: Boolean,
+    createError: String?,
+    onCreate: (name: String, phone: String) -> Unit,
+    onClearCreateError: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    // Non-null while the dialog shows the "new customer" form.
+    var newName by remember { mutableStateOf<String?>(null) }
+    var newPhone by remember { mutableStateOf("") }
+
+    val trimmed = query.trim()
+    val digits = trimmed.filter { it.isDigit() }
+    // A query made only of digits, spaces and phone symbols is a number, not a name.
+    val queryIsNumber = digits.isNotEmpty() && trimmed.all { it.isDigit() || it in " ()-+" }
+    val visible = customers.filter {
+        it.name.contains(trimmed, ignoreCase = true) || (queryIsNumber && it.phone.contains(digits))
+    }
+    val formName = newName
+    val suggestedName = trimmed.split(" ").joinToString(" ") { word -> word.replaceFirstChar { it.uppercase() } }
+
+    fun startCreating() {
+        onClearCreateError()
+        if (queryIsNumber) {
+            newName = ""
+            newPhone = trimmed
+        } else {
+            newName = suggestedName
+            newPhone = ""
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = AppTheme.colors.card,
+        title = { Text(if (formName == null) "Quem está comprando?" else "Novo cliente") },
+        text = {
+            if (formName == null) {
+                Column {
+                    OutlinedTextField(
+                        shape = FieldShape,
+                        colors = fieldColors(),
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = { Text("Nome ou número") },
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (query.isNotEmpty()) {
+                                IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, contentDescription = "Limpar") }
+                            }
+                        },
+                        singleLine = true,
+                    )
+                    if (visible.isEmpty()) {
+                        Text(
+                            if (customers.isEmpty()) "Nenhum cliente cadastrado ainda." else "Nenhum cliente encontrado.",
+                            color = AppTheme.colors.muted,
+                            modifier = Modifier.padding(top = 16.dp),
+                        )
+                    }
+                    LazyColumn(Modifier.heightIn(max = 320.dp).padding(top = 8.dp)) {
+                        items(visible, key = { it.customerId }) { customer ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable { onPick(customer) }.padding(vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Avatar(customer.name, size = 36.dp)
+                                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                                    Text(customer.name, color = AppTheme.colors.ink)
+                                    Text(
+                                        PhoneNumbers.format(customer.phone),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = AppTheme.colors.muted,
+                                    )
+                                }
+                            }
+                            RowDivider()
+                        }
+                    }
+                    PrimaryButton(
+                        text = if (trimmed.isNotEmpty() && !queryIsNumber && visible.none { it.name.equals(trimmed, ignoreCase = true) }) {
+                            "Cadastrar \"$suggestedName\""
+                        } else {
+                            "Novo cliente"
+                        },
+                        icon = Icons.Filled.Add,
+                        onClick = ::startCreating,
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    )
+                }
+            } else {
+                Column {
+                    OutlinedTextField(
+                        shape = FieldShape,
+                        colors = fieldColors(),
+                        value = formName,
+                        onValueChange = { newName = it },
+                        label = { Text("Nome") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    )
+                    OutlinedTextField(
+                        shape = FieldShape,
+                        colors = fieldColors(),
+                        value = newPhone,
+                        onValueChange = { newPhone = it },
+                        label = { Text("WhatsApp com DDD") },
+                        placeholder = { Text("11 99999-8888") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    Text(
+                        "O cliente fica salvo na lista de clientes e entra nesta venda.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppTheme.colors.muted,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    createError?.let {
+                        Text(it, color = AppTheme.colors.dangerText, modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (formName != null) {
+                TextButton(onClick = { onCreate(formName, newPhone) }, enabled = !creating) {
+                    Text(if (creating) "Salvando..." else "Salvar e escolher", color = AppTheme.colors.ink)
+                }
+            }
+        },
+        dismissButton = {
+            if (formName != null) {
+                TextButton(onClick = { newName = null }, enabled = !creating) {
+                    Text("Voltar", color = AppTheme.colors.muted)
+                }
+            } else {
+                TextButton(onClick = onDismiss) { Text("Fechar", color = AppTheme.colors.ink) }
+            }
+        },
+    )
 }
 
 @Composable

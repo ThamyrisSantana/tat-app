@@ -147,7 +147,8 @@ fun DashboardScreen(
         LoadStateContent(state, onRetry = viewModel.loader::retry) { data ->
             PullToRefreshBox(isRefreshing = viewModel.refreshing, onRefresh = viewModel::refresh, modifier = Modifier.fillMaxSize()) {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
+                    // Room at the bottom for the "Nova venda" button and the navigation bar.
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 190.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     if (data.overdueCustomers.isNotEmpty()) {

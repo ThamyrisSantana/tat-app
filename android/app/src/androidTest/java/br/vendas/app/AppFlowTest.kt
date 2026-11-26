@@ -111,8 +111,41 @@ class AppFlowTest {
         compose.onNodeWithText("3x").assertIsDisplayed()
         assertEquals(3, compose.onAllNodesWithText("R$ 20,00").fetchSemanticsNodes().size)
 
-        compose.onNodeWithText("Salvar compra").performScrollTo().performClick()
+        compose.onNodeWithText("Salvar venda").performScrollTo().performClick()
         waitForText("R$ 145,00", exact = true)
+    }
+
+    @Test
+    fun newSaleFromHomePicksTheCustomerAndCanBeUndone() {
+        waitForText("Nova venda")
+        compose.onNodeWithText("Nova venda").performClick()
+        waitForText("Quem está comprando?")
+        compose.onNodeWithText("Nome ou número").performTextInput("maria")
+        compose.onNodeWithText("Maria Silva").performClick()
+
+        compose.onNodeWithText("Adicionar produto").performClick()
+        compose.onNodeWithText("Camiseta").performClick()
+        compose.onNodeWithText("Salvar venda").performScrollTo().performClick()
+
+        waitForText("Venda de R$ 60,00 registrada.")
+        compose.onNodeWithText("Desfazer").performClick()
+        waitForText("Venda cancelada.")
+    }
+
+    @Test
+    fun newSaleCanRegisterTheCustomer() {
+        waitForText("Nova venda")
+        compose.onNodeWithText("Nova venda").performClick()
+        waitForText("Quem está comprando?")
+        compose.onNodeWithText("Nome ou número").performTextInput("carla dias")
+        compose.onNodeWithText("Cadastrar \"Carla Dias\"").performClick()
+
+        compose.onNodeWithText("WhatsApp com DDD").performTextInput("31 91234-5678")
+        compose.onNodeWithText("Salvar e escolher").performClick()
+
+        // The new customer is picked: the header and the customer panel show the name.
+        waitForText("Trocar")
+        assertEquals(2, compose.onAllNodesWithText("Carla Dias").fetchSemanticsNodes().size)
     }
 
     @Test

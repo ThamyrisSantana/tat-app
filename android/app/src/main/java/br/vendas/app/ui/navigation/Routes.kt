@@ -31,7 +31,8 @@ data class CustomerRoute(val customerId: String)
 data class CustomerFormRoute(val customerId: String? = null)
 
 @Serializable
-data class NewPurchaseRoute(val customerId: String)
+/** Without a customer the screen starts by asking who is buying. */
+data class NewPurchaseRoute(val customerId: String? = null)
 
 @Serializable
 data class PurchaseRoute(val purchaseId: String)
