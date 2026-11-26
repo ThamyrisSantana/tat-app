@@ -2,10 +2,13 @@ package br.vendas.app.ui.purchases
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -158,21 +161,27 @@ fun PurchaseDetailScreen(
             ) {
                 item { Summary(detail) }
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Same height for both buttons, even when a label wraps with a large font.
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                    ) {
                         if (purchase.openAmount > Money.ZERO) {
                             PrimaryButton(
                                 "Registrar pagamento",
                                 onClick = { viewModel.openPayment(detail, installment = null) },
                                 icon = AppIcons.Cash,
                                 enabled = !viewModel.busy,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
                             )
                         }
                         SecondaryButton(
                             "Comprovante",
                             onClick = { onOpenReceipt(purchase.id) },
                             icon = AppIcons.Receipt,
-                            modifier = if (purchase.openAmount > Money.ZERO) Modifier else Modifier.weight(1f),
+                            modifier = Modifier.fillMaxHeight().then(
+                                if (purchase.openAmount > Money.ZERO) Modifier else Modifier.weight(1f),
+                            ),
                         )
                     }
                 }

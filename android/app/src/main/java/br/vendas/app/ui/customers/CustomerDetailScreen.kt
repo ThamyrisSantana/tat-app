@@ -3,11 +3,14 @@ package br.vendas.app.ui.customers
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -174,15 +177,19 @@ fun CustomerDetailScreen(
                 if (detail.balance.isOverdue) item { OverdueBanner(detail.balance) }
                 item { BalanceTiles(detail) }
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Same height for both buttons, even when a label wraps with a large font.
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                    ) {
                         PrimaryButton(
                             text = "Registrar pagamento",
                             onClick = viewModel::openSheet,
                             icon = AppIcons.Cash,
                             enabled = detail.balance.openAmount > Money.ZERO,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
                         )
-                        SecondaryButton("Compra", onClick = onNewPurchase, icon = Icons.Filled.Add)
+                        SecondaryButton("Compra", onClick = onNewPurchase, icon = Icons.Filled.Add, modifier = Modifier.fillMaxHeight())
                     }
                 }
                 viewModel.error?.takeIf { !viewModel.sheetOpen }?.let { message ->
