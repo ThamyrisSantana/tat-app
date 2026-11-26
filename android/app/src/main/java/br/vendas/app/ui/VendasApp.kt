@@ -1,13 +1,7 @@
 package br.vendas.app.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -82,10 +76,6 @@ import br.vendas.app.ui.navigation.ReceiptRoute
 import br.vendas.app.ui.navigation.ReceivablesRoute
 import br.vendas.app.ui.navigation.ReportsRoute
 import br.vendas.app.ui.navigation.SettingsRoute
-import br.vendas.app.ui.navigation.enterScreen
-import br.vendas.app.ui.navigation.exitScreen
-import br.vendas.app.ui.navigation.popEnterScreen
-import br.vendas.app.ui.navigation.popExitScreen
 import br.vendas.app.ui.products.ProductListScreen
 import br.vendas.app.ui.purchases.NewPurchaseScreen
 import br.vendas.app.ui.purchases.PurchaseDetailScreen
@@ -156,10 +146,11 @@ private fun MainNavigation(root: RootViewModel) {
                 navController = navController,
                 startDestination = DashboardRoute,
                 modifier = Modifier.fillMaxSize(),
-                enterTransition = { enterScreen(SECTIONS) },
-                exitTransition = { exitScreen(SECTIONS) },
-                popEnterTransition = { popEnterScreen(SECTIONS) },
-                popExitTransition = { popExitScreen(SECTIONS) },
+                // No animation between screens: the new one simply replaces the old one.
+                enterTransition = { EnterTransition.None },
+                exitTransition = { ExitTransition.None },
+                popEnterTransition = { EnterTransition.None },
+                popExitTransition = { ExitTransition.None },
             ) {
                 screen<DashboardRoute> {
                     DashboardScreen(
@@ -231,27 +222,18 @@ private fun MainNavigation(root: RootViewModel) {
 
             val showNavBar = TOP_LEVEL.any { destination.isOn(it.routeClass) } &&
                 !(destination.isOn(CustomersRoute::class) && backStack?.toRoute<CustomersRoute>()?.overdueOnly == true)
-            AnimatedVisibility(
-                visible = showNavBar,
-                enter = slideInVertically(tween(250, easing = LinearOutSlowInEasing)) { it } + fadeIn(tween(250)),
-                exit = slideOutVertically(tween(200, easing = FastOutLinearInEasing)) { it } + fadeOut(tween(150)),
-                modifier = Modifier.align(Alignment.BottomCenter),
-            ) {
+            if (showNavBar) {
                 FloatingNavBar(
                     destination = destination,
                     onSelect = { navController.navigateTopLevel(it.route) },
+                    modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
         }
     }
 }
 
-private val SECTIONS: List<KClass<*>> = TOP_LEVEL.map { it.routeClass }
-
-/**
- * A destination drawn on an opaque background, so that while one screen slides
- * over another (including during the predictive back gesture) they never mix.
- */
+/** A destination drawn on an opaque background, so screens never show through each other. */
 private inline fun <reified T : Any> NavGraphBuilder.screen(
     noinline content: @Composable (NavBackStackEntry) -> Unit,
 ) {
