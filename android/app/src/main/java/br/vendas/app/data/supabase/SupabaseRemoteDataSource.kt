@@ -2,12 +2,14 @@ package br.vendas.app.data.supabase
 
 import br.vendas.app.data.DuplicatePhoneException
 import br.vendas.app.data.DuplicateProductException
-import br.vendas.app.data.PurchaseHasPaidInstallmentsException
+import br.vendas.app.data.PurchaseHasPaymentsException
 import br.vendas.app.data.SalesSnapshot
 import br.vendas.app.domain.Customer
 import br.vendas.app.domain.CustomerInput
 import br.vendas.app.domain.Money
+import br.vendas.app.domain.NewPayment
 import br.vendas.app.domain.NewPurchase
+import br.vendas.app.domain.PaymentExceedsOpenAmountException
 import br.vendas.app.domain.Product
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.exception.PostgrestRestException
@@ -34,6 +36,8 @@ class SupabaseRemoteDataSource @Inject constructor(private val client: SupabaseC
         customers = fetchAll<CustomerDto>("customers", Columns.ALL).map { it.toRecord() },
         products = fetchAll<ProductDto>("products", Columns.ALL).map { it.toDomain() },
         purchases = fetchAll<PurchaseDto>("purchases", Columns.raw(PURCHASE_COLUMNS)).map { it.toDomain() },
+        payments = fetchAll<PaymentDto>("payments", Columns.raw("*, payment_allocations(installment_id, amount)"))
+            .map { it.toDomain() },
     )
 
     suspend fun createCustomer(input: CustomerInput): Customer {
@@ -94,17 +98,32 @@ class SupabaseRemoteDataSource @Inject constructor(private val client: SupabaseC
         return client.postgrest.rpc("create_purchase", parameters).decodeAs<String>()
     }
 
-    suspend fun setInstallmentPaid(installmentId: String, paid: Boolean) {
-        val paidAt = if (paid) OffsetDateTime.now().toString() else null
-        client.from("installments")
-            .update(mapOf("paid_at" to paidAt)) { filter { eq("id", installmentId) } }
+    suspend fun registerPayment(input: NewPayment): String {
+        val parameters = buildJsonObject {
+            put("p_customer_id", input.customerId)
+            put("p_amount", input.amount.toBigDecimal())
+            put("p_paid_on", input.paidOn.toString())
+            input.purchaseId?.let { put("p_purchase_id", it) }
+            input.installmentId?.let { put("p_installment_id", it) }
+            input.notes?.let { put("p_notes", it) }
+        }
+        try {
+            return client.postgrest.rpc("register_payment", parameters).decodeAs<String>()
+        } catch (e: PostgrestRestException) {
+            if (e.hint == "payment_exceeds_open_amount") throw PaymentExceedsOpenAmountException(null)
+            throw e
+        }
+    }
+
+    suspend fun deletePayment(paymentId: String) {
+        client.postgrest.rpc("delete_payment", buildJsonObject { put("p_payment_id", paymentId) })
     }
 
     suspend fun cancelPurchase(purchaseId: String) {
         try {
             client.postgrest.rpc("cancel_purchase", buildJsonObject { put("p_purchase_id", purchaseId) })
         } catch (e: PostgrestRestException) {
-            if (e.hint == "purchase_has_paid_installments") throw PurchaseHasPaidInstallmentsException()
+            if (e.hint == "purchase_has_paid_installments") throw PurchaseHasPaymentsException()
             throw e
         }
     }

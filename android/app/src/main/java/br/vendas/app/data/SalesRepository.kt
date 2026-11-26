@@ -4,8 +4,10 @@ import br.vendas.app.domain.Customer
 import br.vendas.app.domain.CustomerBalance
 import br.vendas.app.domain.CustomerInput
 import br.vendas.app.domain.Money
+import br.vendas.app.domain.NewPayment
 import br.vendas.app.domain.NewPurchase
 import br.vendas.app.domain.OpenInstallment
+import br.vendas.app.domain.Payment
 import br.vendas.app.domain.Product
 import br.vendas.app.domain.Purchase
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +35,9 @@ interface SalesRepository {
 
     /** Deletes the copy saved on the phone (on sign-out). */
     suspend fun clearLocalData()
+
+    /** All the data at once, for the dashboard and reports. */
+    suspend fun snapshot(): SalesSnapshot
 
     suspend fun customerBalances(): List<CustomerBalance>
 
@@ -65,10 +70,21 @@ interface SalesRepository {
     /** Saves the purchase, its items and installments together. Returns the purchase id. */
     suspend fun createPurchase(input: NewPurchase): String
 
-    suspend fun setInstallmentPaid(installmentId: String, paid: Boolean)
-
-    /** @throws PurchaseHasPaidInstallmentsException when a payment must be undone first. */
+    /** @throws PurchaseHasPaymentsException when payments must be removed first. */
     suspend fun cancelPurchase(purchaseId: String)
+
+    /**
+     * Records a payment of any amount, spread over open installments.
+     * @throws br.vendas.app.domain.PaymentExceedsOpenAmountException when it is more than what is open.
+     */
+    suspend fun registerPayment(input: NewPayment): String
+
+    /** Undoes a payment: the installments it paid are open again. */
+    suspend fun deletePayment(paymentId: String)
+
+    suspend fun paymentsOfCustomer(customerId: String): List<Payment>
+
+    suspend fun paymentsOfPurchase(purchaseId: String): List<Payment>
 
     /** Open installments of purchases that are not canceled, due up to [until] (overdue included). */
     suspend fun openInstallmentsDueUntil(until: LocalDate): List<OpenInstallment>
@@ -78,4 +94,4 @@ class DuplicatePhoneException(val existingCustomerName: String?) : Exception("Ph
 
 class DuplicateProductException : Exception("Product name already in use")
 
-class PurchaseHasPaidInstallmentsException : Exception("Undo the paid installments first")
+class PurchaseHasPaymentsException : Exception("Remove the payments first")

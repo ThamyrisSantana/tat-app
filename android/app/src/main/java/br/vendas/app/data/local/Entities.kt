@@ -59,6 +59,23 @@ data class InstallmentEntity(
     @ColumnInfo(name = "amount_cents") val amountCents: Long,
     @ColumnInfo(name = "due_date") val dueDate: String,
     @ColumnInfo(name = "paid_at") val paidAt: String?,
+    @ColumnInfo(name = "paid_amount_cents") val paidAmountCents: Long,
+)
+
+@Entity(tableName = "payments", indices = [Index("customer_id")])
+data class PaymentEntity(
+    @PrimaryKey val id: String,
+    @ColumnInfo(name = "customer_id") val customerId: String,
+    @ColumnInfo(name = "amount_cents") val amountCents: Long,
+    @ColumnInfo(name = "paid_on") val paidOn: String,
+    val notes: String?,
+)
+
+@Entity(tableName = "payment_allocations", primaryKeys = ["payment_id", "installment_id"])
+data class PaymentAllocationEntity(
+    @ColumnInfo(name = "payment_id") val paymentId: String,
+    @ColumnInfo(name = "installment_id") val installmentId: String,
+    @ColumnInfo(name = "amount_cents") val amountCents: Long,
 )
 
 /** One row (id = 0) with the time of the last successful sync. */

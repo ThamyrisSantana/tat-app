@@ -5,7 +5,7 @@ import br.vendas.app.data.AuthState
 import br.vendas.app.data.CustomerRecord
 import br.vendas.app.data.DuplicatePhoneException
 import br.vendas.app.data.DuplicateProductException
-import br.vendas.app.data.PurchaseHasPaidInstallmentsException
+import br.vendas.app.data.PurchaseHasPaymentsException
 import br.vendas.app.data.SalesRepository
 import br.vendas.app.data.SalesSnapshot
 import br.vendas.app.data.SyncStatus
@@ -15,9 +15,12 @@ import br.vendas.app.domain.CustomerInput
 import br.vendas.app.domain.Installment
 import br.vendas.app.domain.InstallmentPlan
 import br.vendas.app.domain.Money
+import br.vendas.app.domain.NewPayment
 import br.vendas.app.domain.NewPurchase
 import br.vendas.app.domain.NewPurchaseItem
 import br.vendas.app.domain.OpenInstallment
+import br.vendas.app.domain.Payment
+import br.vendas.app.domain.PaymentAllocator
 import br.vendas.app.domain.PaymentType
 import br.vendas.app.domain.Product
 import br.vendas.app.domain.Purchase
@@ -32,12 +35,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.OffsetDateTime
 import java.util.UUID
 
 /**
- * In-memory data used when Supabase is not configured. Starts with sample
- * customers and purchases; everything is lost when the app closes.
+ * In-memory data used when Supabase is not configured. Starts with six months
+ * of sample sales and payments; everything is lost when the app closes.
  */
 class DemoRepository : SalesRepository {
 
@@ -55,6 +59,8 @@ class DemoRepository : SalesRepository {
     override suspend fun refresh() = Unit
 
     override suspend fun clearLocalData() = Unit
+
+    override suspend fun snapshot(): SalesSnapshot = read { it }
 
     override suspend fun customerBalances(): List<CustomerBalance> = read { it.customerBalances(today()) }
 
@@ -102,21 +108,34 @@ class DemoRepository : SalesRepository {
 
     override suspend fun createPurchase(input: NewPurchase): String = write { addPurchase(input, PurchaseSource.APP).id }
 
-    override suspend fun setInstallmentPaid(installmentId: String, paid: Boolean) = write {
-        val paidAt = if (paid) OffsetDateTime.now(SHOP_ZONE) else null
-        data = data.copy(
-            purchases = data.purchases.map { purchase ->
-                purchase.copy(installments = purchase.installments.map { if (it.id == installmentId) it.copy(paidAt = paidAt) else it })
-            },
-        )
-    }
-
     override suspend fun cancelPurchase(purchaseId: String) = write {
         val purchase = data.purchase(purchaseId)
-        if (purchase.hasPaidInstallments) throw PurchaseHasPaidInstallmentsException()
+        if (purchase.hasPayments) throw PurchaseHasPaymentsException()
         val canceled = purchase.copy(canceledAt = OffsetDateTime.now(SHOP_ZONE))
         data = data.copy(purchases = data.purchases.map { if (it.id == purchaseId) canceled else it })
     }
+
+    override suspend fun registerPayment(input: NewPayment): String = write { addPayment(input).id }
+
+    override suspend fun deletePayment(paymentId: String) = write {
+        val payment = data.payments.first { it.id == paymentId }
+        val returned = payment.allocations.associate { it.installmentId to it.amount }
+        data = data.copy(
+            purchases = data.purchases.map { purchase ->
+                purchase.copy(
+                    installments = purchase.installments.map { installment ->
+                        val amount = returned[installment.id] ?: return@map installment
+                        installment.copy(paidAmount = installment.paidAmount - amount, paidAt = null)
+                    },
+                )
+            },
+            payments = data.payments.filterNot { it.id == paymentId },
+        )
+    }
+
+    override suspend fun paymentsOfCustomer(customerId: String): List<Payment> = read { it.paymentsOf(customerId) }
+
+    override suspend fun paymentsOfPurchase(purchaseId: String): List<Payment> = read { it.paymentsOfPurchase(purchaseId) }
 
     override suspend fun openInstallmentsDueUntil(until: LocalDate): List<OpenInstallment> =
         read { it.openInstallmentsDueUntil(until) }
@@ -174,52 +193,100 @@ class DemoRepository : SalesRepository {
         return purchase
     }
 
+    private fun addPayment(input: NewPayment): Payment {
+        val allocations = PaymentAllocator.allocate(
+            amount = input.amount,
+            candidates = data.allocationCandidates(input.customerId, input.purchaseId),
+            preferredInstallmentId = input.installmentId,
+        )
+        val received = allocations.associate { it.installmentId to it.amount }
+        val paidAt = OffsetDateTime.of(input.paidOn, LocalTime.NOON, SHOP_ZONE.rules.getOffset(input.paidOn.atTime(LocalTime.NOON)))
+        val payment = Payment(newId(), input.customerId, input.amount, input.paidOn, input.notes, allocations)
+        data = data.copy(
+            purchases = data.purchases.map { purchase ->
+                purchase.copy(
+                    installments = purchase.installments.map { installment ->
+                        val amount = received[installment.id] ?: return@map installment
+                        val paid = installment.paidAmount + amount
+                        installment.copy(paidAmount = paid, paidAt = if (paid >= installment.amount) paidAt else null)
+                    },
+                )
+            },
+            payments = data.payments + payment,
+        )
+        return payment
+    }
+
     private fun newId(): String = UUID.randomUUID().toString()
 
     private fun seed() {
         val camiseta = Product(newId(), "Camiseta", Money(6000), active = true)
         val bone = Product(newId(), "Boné", Money(3500), active = true)
         val caneca = Product(newId(), "Caneca", Money(2500), active = true)
+        val moletom = Product(newId(), "Moletom", Money(12000), active = true)
+        val ecobag = Product(newId(), "Ecobag", Money(3000), active = true)
+        val chaveiro = Product(newId(), "Chaveiro", Money(1200), active = true)
+
         val maria = Customer(newId(), "Maria Silva", "+5511999998888", null)
         val joao = Customer(newId(), "João Souza", "+5511988887777", "Prefere pagar no dia 10")
         val ana = Customer(newId(), "Ana Lima", "+5521977776666", null)
+        val pedro = Customer(newId(), "Pedro Alves", "+5531966665555", null)
+        val juliana = Customer(newId(), "Juliana Costa", "+5541955554444", null)
+        val lucas = Customer(newId(), "Lucas Martins", "+5511944443333", null)
+        val fernanda = Customer(newId(), "Fernanda Rocha", "+5521933332222", "Cliente desde 2025")
         data = SalesSnapshot(
-            customers = listOf(maria, joao, ana).map { CustomerRecord(it, active = true) },
-            products = listOf(camiseta, bone, caneca),
+            customers = listOf(maria, joao, ana, pedro, juliana, lucas, fernanda).map { CustomerRecord(it, active = true) },
+            products = listOf(camiseta, bone, caneca, moletom, ecobag, chaveiro),
             purchases = emptyList(),
         )
 
         val today = today()
-        val mariaPurchase = addPurchase(
-            NewPurchase(maria.id, listOf(NewPurchaseItem(camiseta.id, 1)), 3, today.minusMonths(1).minusDays(5), null, null),
-            PurchaseSource.APP,
+        fun buy(
+            customer: Customer,
+            date: LocalDate,
+            count: Int,
+            vararg items: Pair<Product, Int>,
+            source: PurchaseSource = PurchaseSource.APP,
+            notes: String? = null,
+        ) = addPurchase(
+            NewPurchase(customer.id, items.map { NewPurchaseItem(it.first.id, it.second) }, count, date, null, notes),
+            source,
         )
-        // Maria already paid her first installment.
-        val firstInstallment = mariaPurchase.installments.first().id
-        data = data.copy(
-            purchases = data.purchases.map { purchase ->
-                purchase.copy(
-                    installments = purchase.installments.map {
-                        if (it.id == firstInstallment) it.copy(paidAt = OffsetDateTime.now(SHOP_ZONE).minusDays(6)) else it
-                    },
-                )
-            },
+        fun pay(customer: Customer, cents: Long, date: LocalDate) {
+            addPayment(NewPayment(customer.id, Money(cents), date))
+        }
+
+        // Lucas pays every installment on its due date.
+        val lucasPurchase = buy(lucas, today.minusMonths(5).minusDays(2), 6, moletom to 2)
+        buy(fernanda, today.minusMonths(5).plusDays(6), 1, bone to 2)
+        buy(maria, today.minusMonths(4).minusDays(4), 1, ecobag to 1)
+        // Pedro paid less than the third installment and nothing since.
+        buy(pedro, today.minusMonths(4).minusDays(10), 4, moletom to 1, camiseta to 1)
+        buy(joao, today.minusMonths(3).minusDays(1), 1, moletom to 1)
+        buy(fernanda, today.minusMonths(2).minusDays(3), 1, chaveiro to 5)
+        // Ana has not paid her first installment yet.
+        buy(
+            ana,
+            today.minusMonths(2),
+            2,
+            caneca to 2,
+            bone to 1,
+            source = PurchaseSource.WHATSAPP,
+            notes = "Presente de aniversário",
         )
-        addPurchase(
-            NewPurchase(joao.id, listOf(NewPurchaseItem(bone.id, 1)), 1, today.minusDays(3), null, null),
-            PurchaseSource.APP,
-        )
-        addPurchase(
-            NewPurchase(
-                ana.id,
-                listOf(NewPurchaseItem(caneca.id, 2), NewPurchaseItem(bone.id, 1)),
-                2,
-                today.minusMonths(2),
-                null,
-                "Presente de aniversário",
-            ),
-            PurchaseSource.WHATSAPP,
-        )
+        buy(juliana, today.minusMonths(1).minusDays(12), 1, ecobag to 2, chaveiro to 3)
+        buy(maria, today.minusMonths(1).minusDays(5), 3, camiseta to 1)
+        buy(juliana, today.minusDays(20), 2, caneca to 4)
+        buy(fernanda, today.minusDays(15), 3, camiseta to 3, source = PurchaseSource.WHATSAPP)
+        buy(joao, today.minusDays(3), 1, bone to 1)
+
+        lucasPurchase.installments.filter { !it.dueDate.isAfter(today) }.forEach {
+            pay(lucas, it.amount.cents, it.dueDate)
+        }
+        pay(pedro, 4500, today.minusMonths(3).minusDays(12))
+        pay(pedro, 4500, today.minusMonths(2).minusDays(8))
+        pay(pedro, 3000, today.minusMonths(1).minusDays(5))
+        pay(maria, 2000, today.minusDays(6))
     }
 }
 

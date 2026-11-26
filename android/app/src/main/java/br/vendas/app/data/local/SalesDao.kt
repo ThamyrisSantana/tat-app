@@ -13,6 +13,8 @@ data class LocalData(
     val purchases: List<PurchaseEntity>,
     val items: List<PurchaseItemEntity>,
     val installments: List<InstallmentEntity>,
+    val payments: List<PaymentEntity>,
+    val allocations: List<PaymentAllocationEntity>,
 )
 
 @Dao
@@ -33,11 +35,18 @@ abstract class SalesDao {
     @Query("SELECT * FROM installments ORDER BY number")
     protected abstract suspend fun installments(): List<InstallmentEntity>
 
+    @Query("SELECT * FROM payments")
+    protected abstract suspend fun payments(): List<PaymentEntity>
+
+    @Query("SELECT * FROM payment_allocations")
+    protected abstract suspend fun allocations(): List<PaymentAllocationEntity>
+
     @Query("SELECT * FROM sync_info WHERE id = 0")
     abstract suspend fun syncInfo(): SyncInfoEntity?
 
     @Transaction
-    open suspend fun load(): LocalData = LocalData(customers(), products(), purchases(), items(), installments())
+    open suspend fun load(): LocalData =
+        LocalData(customers(), products(), purchases(), items(), installments(), payments(), allocations())
 
     /** Swaps the whole local copy for [data] in one transaction. */
     @Transaction
@@ -48,6 +57,8 @@ abstract class SalesDao {
         insertPurchases(data.purchases)
         insertItems(data.items)
         insertInstallments(data.installments)
+        insertPayments(data.payments)
+        insertAllocations(data.allocations)
         insertSyncInfo(syncInfo)
     }
 
@@ -58,6 +69,8 @@ abstract class SalesDao {
     }
 
     private suspend fun clearTables() {
+        deleteAllocations()
+        deletePayments()
         deleteInstallments()
         deleteItems()
         deletePurchases()
@@ -81,6 +94,12 @@ abstract class SalesDao {
     protected abstract suspend fun insertInstallments(rows: List<InstallmentEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    protected abstract suspend fun insertPayments(rows: List<PaymentEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    protected abstract suspend fun insertAllocations(rows: List<PaymentAllocationEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     protected abstract suspend fun insertSyncInfo(row: SyncInfoEntity)
 
     @Query("DELETE FROM customers")
@@ -97,6 +116,12 @@ abstract class SalesDao {
 
     @Query("DELETE FROM installments")
     protected abstract suspend fun deleteInstallments()
+
+    @Query("DELETE FROM payments")
+    protected abstract suspend fun deletePayments()
+
+    @Query("DELETE FROM payment_allocations")
+    protected abstract suspend fun deleteAllocations()
 
     @Query("DELETE FROM sync_info")
     protected abstract suspend fun deleteSyncInfo()

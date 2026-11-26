@@ -5,6 +5,8 @@ import br.vendas.app.data.SalesSnapshot
 import br.vendas.app.domain.Customer
 import br.vendas.app.domain.Installment
 import br.vendas.app.domain.Money
+import br.vendas.app.domain.Payment
+import br.vendas.app.domain.PaymentAllocation
 import br.vendas.app.domain.PaymentType
 import br.vendas.app.domain.Product
 import br.vendas.app.domain.Purchase
@@ -16,6 +18,7 @@ import java.time.OffsetDateTime
 fun LocalData.toSnapshot(): SalesSnapshot {
     val itemsByPurchase = items.groupBy { it.purchaseId }
     val installmentsByPurchase = installments.groupBy { it.purchaseId }
+    val allocationsByPayment = allocations.groupBy { it.paymentId }
     return SalesSnapshot(
         customers = customers.map { CustomerRecord(Customer(it.id, it.name, it.phone, it.notes), it.active) },
         products = products.map { Product(it.id, it.name, Money(it.priceCents), it.active) },
@@ -41,7 +44,20 @@ fun LocalData.toSnapshot(): SalesSnapshot {
                         amount = Money(it.amountCents),
                         dueDate = LocalDate.parse(it.dueDate),
                         paidAt = it.paidAt?.let(OffsetDateTime::parse),
+                        paidAmount = Money(it.paidAmountCents),
                     )
+                },
+            )
+        },
+        payments = payments.map { payment ->
+            Payment(
+                id = payment.id,
+                customerId = payment.customerId,
+                amount = Money(payment.amountCents),
+                paidOn = LocalDate.parse(payment.paidOn),
+                notes = payment.notes,
+                allocations = allocationsByPayment[payment.id].orEmpty().map {
+                    PaymentAllocation(it.installmentId, Money(it.amountCents))
                 },
             )
         },
@@ -74,7 +90,19 @@ fun SalesSnapshot.toLocalData(): LocalData = LocalData(
     },
     installments = purchases.flatMap { purchase ->
         purchase.installments.map {
-            InstallmentEntity(it.id, purchase.id, it.number, it.amount.cents, it.dueDate.toString(), it.paidAt?.toString())
+            InstallmentEntity(
+                id = it.id,
+                purchaseId = purchase.id,
+                number = it.number,
+                amountCents = it.amount.cents,
+                dueDate = it.dueDate.toString(),
+                paidAt = it.paidAt?.toString(),
+                paidAmountCents = it.paidAmount.cents,
+            )
         }
+    },
+    payments = payments.map { PaymentEntity(it.id, it.customerId, it.amount.cents, it.paidOn.toString(), it.notes) },
+    allocations = payments.flatMap { payment ->
+        payment.allocations.map { PaymentAllocationEntity(payment.id, it.installmentId, it.amount.cents) }
     },
 )

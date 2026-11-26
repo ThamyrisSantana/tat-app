@@ -4,6 +4,8 @@ import br.vendas.app.data.CustomerRecord
 import br.vendas.app.domain.Customer
 import br.vendas.app.domain.Installment
 import br.vendas.app.domain.Money
+import br.vendas.app.domain.Payment
+import br.vendas.app.domain.PaymentAllocation
 import br.vendas.app.domain.PaymentType
 import br.vendas.app.domain.Product
 import br.vendas.app.domain.Purchase
@@ -76,8 +78,34 @@ internal data class InstallmentDto(
     @Serializable(with = MoneySerializer::class) val amount: Money,
     @SerialName("due_date") @Serializable(with = LocalDateSerializer::class) val dueDate: LocalDate,
     @SerialName("paid_at") @Serializable(with = OffsetDateTimeSerializer::class) val paidAt: OffsetDateTime? = null,
+    @SerialName("paid_amount") @Serializable(with = MoneySerializer::class) val paidAmount: Money = Money.ZERO,
 ) {
-    fun toDomain() = Installment(id, purchaseId, number, amount, dueDate, paidAt)
+    fun toDomain() = Installment(id, purchaseId, number, amount, dueDate, paidAt, paidAmount)
+}
+
+@Serializable
+internal data class PaymentAllocationDto(
+    @SerialName("installment_id") val installmentId: String,
+    @Serializable(with = MoneySerializer::class) val amount: Money,
+)
+
+@Serializable
+internal data class PaymentDto(
+    val id: String,
+    @SerialName("customer_id") val customerId: String,
+    @Serializable(with = MoneySerializer::class) val amount: Money,
+    @SerialName("paid_on") @Serializable(with = LocalDateSerializer::class) val paidOn: LocalDate,
+    val notes: String? = null,
+    @SerialName("payment_allocations") val allocations: List<PaymentAllocationDto> = emptyList(),
+) {
+    fun toDomain() = Payment(
+        id = id,
+        customerId = customerId,
+        amount = amount,
+        paidOn = paidOn,
+        notes = notes,
+        allocations = allocations.map { PaymentAllocation(it.installmentId, it.amount) },
+    )
 }
 
 @Serializable
