@@ -38,12 +38,15 @@ import br.vendas.app.ui.common.LoadStateContent
 import br.vendas.app.ui.common.formatCompact
 import br.vendas.app.ui.common.formatLong
 import br.vendas.app.ui.common.formatShort
+import br.vendas.app.ui.common.longName
+import br.vendas.app.ui.common.plural
 import br.vendas.app.ui.common.shortName
 import br.vendas.app.ui.design.AppIcons
 import br.vendas.app.ui.design.Avatar
 import br.vendas.app.ui.design.Bar
 import br.vendas.app.ui.design.BarChart
 import br.vendas.app.ui.design.CircleIconButton
+import br.vendas.app.ui.design.KpiRow
 import br.vendas.app.ui.design.KpiTile
 import br.vendas.app.ui.design.ListRow
 import br.vendas.app.ui.design.OverdueAlert
@@ -66,6 +69,10 @@ data class DashboardData(
     val soldThisMonth: Money,
     val salesThisMonth: Int,
     val receivedThisMonth: Money,
+    val paymentsThisMonth: Int,
+    /** "novembro" */
+    val monthName: String,
+    /** Customers who still owe something. */
     val customerCount: Int,
     val lastMonths: List<MonthlySales>,
     val upcoming: List<OpenInstallment>,
@@ -92,7 +99,9 @@ class DashboardViewModel @Inject constructor(
             soldThisMonth = report.total,
             salesThisMonth = report.purchaseCount,
             receivedThisMonth = report.received,
-            customerCount = balances.size,
+            paymentsThisMonth = snapshot.payments.count { YearMonth.from(it.paidOn) == month },
+            monthName = month.longName().substringBefore(" de ").lowercase(),
+            customerCount = balances.count { it.openAmount > Money.ZERO },
             lastMonths = Reports.salesByMonth(snapshot.purchases, Reports.monthsUpTo(month, 6)),
             upcoming = snapshot.openInstallmentsDueUntil(today.plusDays(7)).filterNot { it.installment.isOverdue(today) },
         )
@@ -152,11 +161,11 @@ fun DashboardScreen(
                         }
                     }
                     item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        KpiRow {
                             KpiTile(
                                 label = "A receber",
                                 value = data.totalOpen.format(),
-                                caption = "${data.customerCount} clientes",
+                                caption = "de ${plural(data.customerCount, "cliente", "clientes")}",
                                 style = TileStyle.DARK,
                                 icon = AppIcons.Wallet,
                                 onClick = onOpenReceivables,
@@ -165,7 +174,7 @@ fun DashboardScreen(
                             KpiTile(
                                 label = "Atrasado",
                                 value = data.overdueTotal.format(),
-                                caption = "${data.overdueCustomers.size} clientes",
+                                caption = "de ${plural(data.overdueCustomers.size, "cliente", "clientes")}",
                                 icon = br.vendas.app.ui.design.AppIcons.Receipt,
                                 onClick = onOpenOverdueCustomers,
                                 modifier = Modifier.weight(1f),
@@ -173,19 +182,19 @@ fun DashboardScreen(
                         }
                     }
                     item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        KpiRow {
                             KpiTile(
-                                label = "Vendido no mês",
+                                label = "Vendas em ${data.monthName}",
                                 value = data.soldThisMonth.format(),
-                                caption = "${data.salesThisMonth} vendas",
+                                caption = plural(data.salesThisMonth, "venda", "vendas"),
                                 icon = AppIcons.BarChart,
                                 onClick = onOpenReports,
                                 modifier = Modifier.weight(1f),
                             )
                             KpiTile(
-                                label = "Recebido no mês",
+                                label = "Recebido em ${data.monthName}",
                                 value = data.receivedThisMonth.format(),
-                                caption = "pagamentos",
+                                caption = plural(data.paymentsThisMonth, "pagamento", "pagamentos"),
                                 icon = AppIcons.Cash,
                                 modifier = Modifier.weight(1f),
                             )

@@ -36,6 +36,7 @@ import br.vendas.app.ui.common.EmptyBox
 import br.vendas.app.ui.common.LoadStateContent
 import br.vendas.app.ui.common.formatCompact
 import br.vendas.app.ui.common.longName
+import br.vendas.app.ui.common.plural
 import br.vendas.app.ui.common.shortName
 import br.vendas.app.ui.design.AppIcons
 import br.vendas.app.ui.design.Avatar
@@ -43,6 +44,7 @@ import br.vendas.app.ui.design.Bar
 import br.vendas.app.ui.design.BarChart
 import br.vendas.app.ui.design.CircleIconButton
 import br.vendas.app.ui.design.DonutChart
+import br.vendas.app.ui.design.KpiRow
 import br.vendas.app.ui.design.KpiTile
 import br.vendas.app.ui.design.Legend
 import br.vendas.app.ui.design.ListRow
@@ -143,11 +145,11 @@ private fun MonthSelector(viewModel: ReportsViewModel) {
 @Composable
 private fun Kpis(report: MonthReport) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        KpiRow {
             KpiTile(
                 label = "Vendido",
                 value = report.total.format(),
-                caption = "${report.purchaseCount} vendas",
+                caption = plural(report.purchaseCount, "venda", "vendas"),
                 style = TileStyle.DARK,
                 icon = AppIcons.BarChart,
                 modifier = Modifier.weight(1f),
@@ -160,7 +162,7 @@ private fun Kpis(report: MonthReport) {
                 modifier = Modifier.weight(1f),
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        KpiRow {
             KpiTile(
                 label = "Ticket médio",
                 value = report.averageTicket.format(),
@@ -170,7 +172,7 @@ private fun Kpis(report: MonthReport) {
             KpiTile(
                 label = "Nº de vendas",
                 value = report.purchaseCount.toString(),
-                caption = "${report.topCustomers.size} clientes",
+                caption = plural(report.customerCount, "cliente", "clientes"),
                 modifier = Modifier.weight(1f),
             )
         }

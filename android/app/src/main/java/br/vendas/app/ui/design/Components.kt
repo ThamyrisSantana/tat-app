@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -138,6 +140,16 @@ fun SectionHeader(
 
 enum class TileStyle { LIGHT, DARK, DANGER }
 
+/** Side-by-side KPI tiles of equal height. Give each tile `Modifier.weight(1f)`. */
+@Composable
+fun KpiRow(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
+    Row(
+        modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        content = content,
+    )
+}
+
 /** A big number with its label, as in the reference dashboards' KPI row. */
 @Composable
 fun KpiTile(
@@ -157,6 +169,8 @@ fun KpiTile(
     }
     Column(
         modifier
+            // In a KpiRow, tiles stretch to the tallest one so labels that wrap keep the row even.
+            .fillMaxHeight()
             .clip(CardShape)
             .background(background)
             .then(if (style == TileStyle.LIGHT) Modifier.border(1.dp, colors.cardBorder, CardShape) else Modifier)
@@ -164,12 +178,13 @@ fun KpiTile(
             .padding(18.dp)
             .heightIn(min = 92.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.Top) {
             if (icon != null) {
-                Icon(icon, contentDescription = null, tint = secondary, modifier = Modifier.size(16.dp))
+                Icon(icon, contentDescription = null, tint = secondary, modifier = Modifier.padding(top = 2.dp).size(16.dp))
                 Spacer(Modifier.width(6.dp))
             }
-            Text(label, style = MaterialTheme.typography.labelLarge, color = secondary, maxLines = 1)
+            // Wraps instead of cutting words when the phone uses a large font.
+            Text(label, style = MaterialTheme.typography.labelLarge, color = secondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         Text(
             value,

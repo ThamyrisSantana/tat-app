@@ -14,6 +14,8 @@ data class MonthReport(
     val month: YearMonth,
     val total: Money,
     val purchaseCount: Int,
+    /** Distinct customers who bought in the month. */
+    val customerCount: Int,
     val averageTicket: Money,
     val cashTotal: Money,
     val installmentsTotal: Money,
@@ -74,6 +76,7 @@ object Reports {
             month = month,
             total = total,
             purchaseCount = inMonth.size,
+            customerCount = inMonth.map { it.customerId }.distinct().size,
             averageTicket = if (inMonth.isEmpty()) Money.ZERO else Money(total.cents / inMonth.size),
             cashTotal = inMonth.filter { it.paymentType == PaymentType.CASH }.map { it.total }.sum(),
             installmentsTotal = inMonth.filter { it.paymentType == PaymentType.INSTALLMENTS }.map { it.total }.sum(),

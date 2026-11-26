@@ -39,11 +39,13 @@ import br.vendas.app.ui.common.LoadStateContent
 import br.vendas.app.ui.common.formatCompact
 import br.vendas.app.ui.common.formatShort
 import br.vendas.app.ui.common.longName
+import br.vendas.app.ui.common.plural
 import br.vendas.app.ui.common.shortName
 import br.vendas.app.ui.design.AppIcons
 import br.vendas.app.ui.design.Avatar
 import br.vendas.app.ui.design.Bar
 import br.vendas.app.ui.design.BarChart
+import br.vendas.app.ui.design.KpiRow
 import br.vendas.app.ui.design.KpiTile
 import br.vendas.app.ui.design.ListRow
 import br.vendas.app.ui.design.Panel
@@ -100,18 +102,18 @@ fun ReceivablesScreen(onOpenCustomer: (String) -> Unit, viewModel: ReceivablesVi
                     KpiTile(
                         label = "Total a receber",
                         value = summary.totalOpen.format(),
-                        caption = "${summary.months.sumOf { it.installmentCount } + summary.overdueCount} parcelas em aberto",
+                        caption = plural(summary.months.sumOf { it.installmentCount } + summary.overdueCount, "parcela", "parcelas") + " em aberto",
                         style = TileStyle.DARK,
                         icon = AppIcons.Wallet,
                         modifier = Modifier.padding(0.dp),
                     )
                 }
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    KpiRow {
                         KpiTile(
                             label = "Atrasado",
                             value = summary.overdue.format(),
-                            caption = "${summary.overdueCount} parcelas",
+                            caption = plural(summary.overdueCount, "parcela", "parcelas"),
                             style = if (summary.overdue > Money.ZERO) TileStyle.DANGER else TileStyle.LIGHT,
                             modifier = Modifier.weight(1f),
                         )
@@ -142,7 +144,7 @@ fun ReceivablesScreen(onOpenCustomer: (String) -> Unit, viewModel: ReceivablesVi
                     item {
                         InstallmentsPanel(
                             title = "Atrasadas",
-                            subtitle = "${summary.overdueCount} parcelas · ${summary.overdue.format()}",
+                            subtitle = "${plural(summary.overdueCount, "parcela", "parcelas")} · ${summary.overdue.format()}",
                             installments = data.overdue,
                             overdue = true,
                             onOpenCustomer = onOpenCustomer,
@@ -178,7 +180,7 @@ private fun MonthPanel(
     Panel(contentPadding = PaddingValues(vertical = 4.dp)) {
         ListRow(
             title = month.month.longName(),
-            subtitle = "${month.installmentCount} parcelas",
+            subtitle = plural(month.installmentCount, "parcela", "parcelas"),
             trailing = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(month.amount.format(), style = MaterialTheme.typography.titleSmall, color = AppTheme.colors.ink)

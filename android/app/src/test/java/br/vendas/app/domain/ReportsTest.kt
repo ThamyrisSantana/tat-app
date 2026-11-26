@@ -71,6 +71,7 @@ class ReportsTest {
 
         assertEquals(Money(21500), report.total)
         assertEquals(2, report.purchaseCount)
+        assertEquals(2, report.customerCount)
         assertEquals(Money(10750), report.averageTicket)
         assertEquals(Money(3000), report.received)
         assertEquals(listOf("camiseta", "bone"), report.topProducts.map { it.productId })

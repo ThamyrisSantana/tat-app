@@ -65,6 +65,7 @@ import br.vendas.app.ui.design.AppIcons
 import br.vendas.app.ui.design.Avatar
 import br.vendas.app.ui.design.CardShape
 import br.vendas.app.ui.design.CircleIconButton
+import br.vendas.app.ui.design.KpiRow
 import br.vendas.app.ui.design.KpiTile
 import br.vendas.app.ui.design.ListRow
 import br.vendas.app.ui.design.Panel
@@ -277,7 +278,7 @@ private fun OverdueBanner(balance: CustomerBalance) {
 private fun BalanceTiles(detail: CustomerDetail) {
     val balance = detail.balance
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        KpiRow {
             KpiTile(
                 label = "Total devido",
                 value = balance.openAmount.format(),
@@ -293,7 +294,7 @@ private fun BalanceTiles(detail: CustomerDetail) {
                 modifier = Modifier.weight(1f),
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        KpiRow {
             KpiTile(
                 label = "Total comprado",
                 value = detail.totalBought.format(),
