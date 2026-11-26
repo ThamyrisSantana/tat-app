@@ -60,17 +60,18 @@ Without Supabase settings the app runs in **demo mode**: sample customers and pu
 
 ## Connecting to Supabase
 
-1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor**, paste the contents of `supabase/migrations/20261125000000_initial_schema.sql` and run it.
-3. In **Authentication → Users**, add the user (e-mail and password) who will use the app. There is no sign-up screen in the app.
-4. In **Project Settings → API**, copy the project URL and the `anon` public key into `android/local.properties`:
+1. Create a project at [supabase.com](https://supabase.com) (region South America, São Paulo).
+2. Open **SQL Editor** and run each file in `supabase/migrations/` in name order, one at a time: first `20261125000000_initial_schema.sql`, then `20261126000000_flexible_payments.sql`.
+3. In **Authentication → Users**, add the user (e-mail and password) who will use the app, with **Auto Confirm User** checked. There is no sign-up screen in the app.
+4. In **Authentication → Sign In / Providers**, turn off **Allow new users to sign up**. Every signed-in user can read and write all data, so nobody else may be able to create an account with the public key.
+5. In **Project Settings → API Keys**, copy the project URL and the `anon` public key (tab **Legacy API keys**) into `android/local.properties`:
 
    ```properties
    supabase.url=https://<project>.supabase.co
    supabase.anonKey=<anon public key>
    ```
 
-5. Build again. The app now asks for the e-mail and password.
+6. Build again. The app now asks for the e-mail and password.
 
 `local.properties` is not committed. The anon key is safe in the app because every table is protected by row level security: only signed-in users can read or write. The bot tables (`authorized_senders`, `whatsapp_messages`, `bot_conversations`) have RLS on and no policies, so only the service role used by the future webhook can reach them.
 
