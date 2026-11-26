@@ -46,7 +46,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -159,7 +161,7 @@ private fun MainNavigation(root: RootViewModel) {
                 popEnterTransition = { popEnterScreen(SECTIONS) },
                 popExitTransition = { popExitScreen(SECTIONS) },
             ) {
-                composable<DashboardRoute> {
+                screen<DashboardRoute> {
                     DashboardScreen(
                         onOpenCustomer = { navController.navigate(CustomerRoute(it)) },
                         onOpenOverdueCustomers = { navController.navigate(CustomersRoute(overdueOnly = true)) },
@@ -168,7 +170,7 @@ private fun MainNavigation(root: RootViewModel) {
                         onOpenSettings = { navController.navigate(SettingsRoute) },
                     )
                 }
-                composable<CustomersRoute> { entry ->
+                screen<CustomersRoute> { entry ->
                     val filtered = entry.toRoute<CustomersRoute>().overdueOnly
                     CustomerListScreen(
                         onOpenCustomer = { navController.navigate(CustomerRoute(it)) },
@@ -176,17 +178,17 @@ private fun MainNavigation(root: RootViewModel) {
                         onBack = if (filtered) ({ navController.popBackStack() }) else null,
                     )
                 }
-                composable<ReceivablesRoute> {
+                screen<ReceivablesRoute> {
                     ReceivablesScreen(onOpenCustomer = { navController.navigate(CustomerRoute(it)) })
                 }
-                composable<ReportsRoute> {
+                screen<ReportsRoute> {
                     ReportsScreen(onOpenCustomer = { navController.navigate(CustomerRoute(it)) })
                 }
-                composable<ProductsRoute> { ProductListScreen() }
-                composable<SettingsRoute> {
+                screen<ProductsRoute> { ProductListScreen() }
+                screen<SettingsRoute> {
                     SettingsScreen(onBack = { navController.popBackStack() }, onSignOut = signOut)
                 }
-                composable<CustomerRoute> { entry ->
+                screen<CustomerRoute> { entry ->
                     val customerId = entry.toRoute<CustomerRoute>().customerId
                     CustomerDetailScreen(
                         onBack = { navController.popBackStack() },
@@ -195,7 +197,7 @@ private fun MainNavigation(root: RootViewModel) {
                         onOpenPurchase = { navController.navigate(PurchaseRoute(it)) },
                     )
                 }
-                composable<CustomerFormRoute> { entry ->
+                screen<CustomerFormRoute> { entry ->
                     val editing = entry.toRoute<CustomerFormRoute>().customerId != null
                     CustomerFormScreen(
                         onBack = { navController.popBackStack() },
@@ -212,19 +214,19 @@ private fun MainNavigation(root: RootViewModel) {
                         onRemoved = { navController.popBackStack<CustomerRoute>(inclusive = true) },
                     )
                 }
-                composable<NewPurchaseRoute> {
+                screen<NewPurchaseRoute> {
                     NewPurchaseScreen(
                         onBack = { navController.popBackStack() },
                         onSaved = { navController.popBackStack() },
                     )
                 }
-                composable<PurchaseRoute> {
+                screen<PurchaseRoute> {
                     PurchaseDetailScreen(
                         onBack = { navController.popBackStack() },
                         onOpenReceipt = { navController.navigate(ReceiptRoute(it)) },
                     )
                 }
-                composable<ReceiptRoute> { ReceiptScreen(onBack = { navController.popBackStack() }) }
+                screen<ReceiptRoute> { ReceiptScreen(onBack = { navController.popBackStack() }) }
             }
 
             val showNavBar = TOP_LEVEL.any { destination.isOn(it.routeClass) } &&
@@ -245,6 +247,18 @@ private fun MainNavigation(root: RootViewModel) {
 }
 
 private val SECTIONS: List<KClass<*>> = TOP_LEVEL.map { it.routeClass }
+
+/**
+ * A destination drawn on an opaque background, so that while one screen slides
+ * over another (including during the predictive back gesture) they never mix.
+ */
+private inline fun <reified T : Any> NavGraphBuilder.screen(
+    noinline content: @Composable (NavBackStackEntry) -> Unit,
+) {
+    composable<T> { entry ->
+        Box(Modifier.fillMaxSize().background(AppTheme.colors.canvas)) { content(entry) }
+    }
+}
 
 private fun NavDestination?.isOn(route: KClass<*>): Boolean = this?.hasRoute(route) == true
 

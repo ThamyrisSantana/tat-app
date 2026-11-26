@@ -3,13 +3,10 @@ package br.vendas.app.ui.navigation
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.navigation.NavBackStackEntry
@@ -17,53 +14,55 @@ import androidx.navigation.NavDestination.Companion.hasRoute
 import kotlin.reflect.KClass
 
 /*
- * Screen transitions following Material motion. The library default is a
- * 700 ms crossfade in which both screens show half-transparent on top of each
- * other; here the outgoing screen fades out quickly before the incoming one
- * fades in, so the two never overlap.
+ * Screen transitions. Every screen draws its own opaque background (see
+ * VendasApp), so a screen moving over another never shows both mixed.
  *
- * - Between bottom-bar sections: "fade through" (fade out, then fade in with a
- *   slight zoom).
- * - Opening or closing a screen: "shared axis X" (a short horizontal slide).
+ * - Opening a screen: it slides in from the right over the current one, which
+ *   drifts a little to the left (parallax).
+ * - Going back (button or predictive back gesture): the screen slides out to
+ *   the right and uncovers the previous one, already fully drawn underneath.
+ *   This works while the gesture scrubs the animation: nothing fades to blank.
+ * - Between bottom-bar sections: the new section fades in over the old one,
+ *   which stays visible until the fade ends.
+ *
+ * Navigation draws the screen being popped on top, so going back looks right.
  */
 
-private const val DURATION_MS = 300
-private const val OUT_MS = 90
-private const val IN_MS = DURATION_MS - OUT_MS
+private const val SLIDE_MS = 320
+private const val FADE_MS = 220
 
-/** Slide distance: a tenth of the width, enough to show direction without a full page swipe. */
-private val slide: (Int) -> Int = { width -> width / 10 }
+private val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(SLIDE_MS, easing = FastOutSlowInEasing)
 
-private val fadeInLate = fadeIn(tween(IN_MS, delayMillis = OUT_MS, easing = LinearOutSlowInEasing))
-private val fadeOutEarly = fadeOut(tween(OUT_MS, easing = FastOutLinearInEasing))
+/** The screen underneath moves a quarter of the width, for depth. */
+private val parallax: (Int) -> Int = { width -> width / 4 }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.isSectionSwitch(sections: List<KClass<*>>): Boolean =
     sections.any { initialState.destination.hasRoute(it) } && sections.any { targetState.destination.hasRoute(it) }
 
 fun AnimatedContentTransitionScope<NavBackStackEntry>.enterScreen(sections: List<KClass<*>>): EnterTransition =
     if (isSectionSwitch(sections)) {
-        fadeInLate + scaleIn(tween(IN_MS, delayMillis = OUT_MS, easing = LinearOutSlowInEasing), initialScale = 0.96f)
+        fadeIn(tween(FADE_MS))
     } else {
-        slideInHorizontally(tween(DURATION_MS, easing = FastOutSlowInEasing), slide) + fadeInLate
+        slideInHorizontally(slideSpec) { width -> width }
     }
 
 fun AnimatedContentTransitionScope<NavBackStackEntry>.exitScreen(sections: List<KClass<*>>): ExitTransition =
     if (isSectionSwitch(sections)) {
-        fadeOutEarly
+        ExitTransition.KeepUntilTransitionsFinished
     } else {
-        slideOutHorizontally(tween(DURATION_MS, easing = FastOutSlowInEasing)) { -slide(it) } + fadeOutEarly
+        slideOutHorizontally(slideSpec) { width -> -parallax(width) }
     }
 
 fun AnimatedContentTransitionScope<NavBackStackEntry>.popEnterScreen(sections: List<KClass<*>>): EnterTransition =
     if (isSectionSwitch(sections)) {
-        enterScreen(sections)
+        EnterTransition.None
     } else {
-        slideInHorizontally(tween(DURATION_MS, easing = FastOutSlowInEasing)) { -slide(it) } + fadeInLate
+        slideInHorizontally(slideSpec) { width -> -parallax(width) }
     }
 
 fun AnimatedContentTransitionScope<NavBackStackEntry>.popExitScreen(sections: List<KClass<*>>): ExitTransition =
     if (isSectionSwitch(sections)) {
-        fadeOutEarly
+        fadeOut(tween(FADE_MS))
     } else {
-        slideOutHorizontally(tween(DURATION_MS, easing = FastOutSlowInEasing), slide) + fadeOutEarly
+        slideOutHorizontally(slideSpec) { width -> width }
     }
