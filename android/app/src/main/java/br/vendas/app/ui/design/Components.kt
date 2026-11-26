@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.PaddingValues
@@ -301,11 +302,15 @@ fun SecondaryButton(
 
 /** Selectable pills, like the Daily / Weekly / Monthly switch of the references. */
 @Composable
-fun <T> PillTabs(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+fun <T> PillTabs(
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    /** Break into more lines instead of scrolling sideways, so no option is hidden past the edge. */
+    wrap: Boolean = false,
+) {
+    val pills: @Composable () -> Unit = {
         options.forEach { (value, label) ->
             val isSelected = value == selected
             Text(
@@ -320,6 +325,15 @@ fun <T> PillTabs(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> U
                     .padding(horizontal = 16.dp, vertical = 9.dp),
             )
         }
+    }
+    if (wrap) {
+        FlowRow(
+            modifier,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) { pills() }
+    } else {
+        Row(modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) { pills() }
     }
 }
 

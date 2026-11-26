@@ -153,6 +153,7 @@ fun PaymentSheet(
                     options = context.suggestions.map { (label, value) -> value to "$label ${value.format()}" },
                     selected = amount ?: Money(-1),
                     onSelect = { amountText = it.toInputText() },
+                    wrap = true,
                 )
             }
 
