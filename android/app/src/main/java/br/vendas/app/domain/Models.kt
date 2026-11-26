@@ -2,6 +2,7 @@ package br.vendas.app.domain
 
 import java.time.LocalDate
 import java.time.OffsetDateTime
+import java.time.YearMonth
 import java.time.ZoneId
 
 /** The shop's time zone: decides what "today" and "overdue" mean. */
@@ -17,6 +18,9 @@ data class Customer(
     val notes: String?,
 )
 
+/** What is due in one month. */
+data class MonthDue(val month: YearMonth, val amount: Money)
+
 /** What a customer owes, as listed on the Customers screen. */
 data class CustomerBalance(
     val customerId: String,
@@ -25,7 +29,16 @@ data class CustomerBalance(
     val openAmount: Money,
     val overdueAmount: Money,
     val nextDueDate: LocalDate?,
-)
+    /** Due date of the oldest overdue installment, to say how late the customer is. */
+    val oldestOverdueDate: LocalDate? = null,
+    /** What is due in the first month (this month or later) that has open installments. */
+    val monthlyDue: MonthDue? = null,
+) {
+    val isOverdue: Boolean get() = overdueAmount > Money.ZERO
+
+    fun daysOverdue(today: LocalDate): Long =
+        oldestOverdueDate?.let { java.time.temporal.ChronoUnit.DAYS.between(it, today) } ?: 0
+}
 
 data class CustomerInput(
     val name: String,
@@ -61,9 +74,15 @@ data class Purchase(
     val isCanceled: Boolean get() = canceledAt != null
 
     val openAmount: Money
-        get() = if (isCanceled) Money.ZERO else installments.filterNot { it.isPaid }.map { it.amount }.sum()
+        get() = if (isCanceled) Money.ZERO else installments.map { it.remaining }.sum()
 
-    val hasPaidInstallments: Boolean get() = installments.any { it.isPaid }
+    val paidAmount: Money get() = installments.map { it.paidAmount }.sum()
+
+    /** True when any amount was paid: payments must be removed before canceling. */
+    val hasPayments: Boolean get() = installments.any { it.paidAmount > Money.ZERO }
+
+    /** The regular installment value (the last one may differ by a few cents). */
+    val installmentAmount: Money? get() = installments.firstOrNull()?.amount
 }
 
 data class PurchaseItem(
@@ -81,14 +100,45 @@ data class Installment(
     val number: Int,
     val amount: Money,
     val dueDate: LocalDate,
+    /** Set when the installment is fully paid. */
     val paidAt: OffsetDateTime?,
+    /** How much of [amount] was paid so far (payments may cover it partly). */
+    val paidAmount: Money = if (paidAt != null) amount else Money.ZERO,
 ) {
-    val isPaid: Boolean get() = paidAt != null
+    val remaining: Money get() = amount - paidAmount
+
+    val isPaid: Boolean get() = remaining <= Money.ZERO
+
+    val isPartiallyPaid: Boolean get() = !isPaid && paidAmount > Money.ZERO
 
     fun isOverdue(today: LocalDate): Boolean = !isPaid && dueDate.isBefore(today)
 }
 
-/** An open installment with its customer, for the Summary screen. */
+/** Part of a payment applied to one installment. */
+data class PaymentAllocation(val installmentId: String, val amount: Money)
+
+/** Money received from a customer, spread over their installments. */
+data class Payment(
+    val id: String,
+    val customerId: String,
+    val amount: Money,
+    val paidOn: LocalDate,
+    val notes: String?,
+    val allocations: List<PaymentAllocation>,
+)
+
+data class NewPayment(
+    val customerId: String,
+    val amount: Money,
+    val paidOn: LocalDate,
+    /** Only this purchase's installments; null spreads over all the customer's purchases. */
+    val purchaseId: String? = null,
+    /** Installment to pay first. */
+    val installmentId: String? = null,
+    val notes: String? = null,
+)
+
+/** An open installment with its customer, for the dashboard and receivables. */
 data class OpenInstallment(
     val installment: Installment,
     val customerId: String,
@@ -108,3 +158,6 @@ data class NewPurchase(
     val firstDueDate: LocalDate?,
     val notes: String?,
 )
+
+/** [openAmount] is what could still be paid, when known. */
+class PaymentExceedsOpenAmountException(val openAmount: Money?) : Exception("Payment is larger than the open amount")
