@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,9 +23,16 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,11 +66,15 @@ import br.vendas.app.data.SyncStatus
 import br.vendas.app.di.AppConfig
 import br.vendas.app.domain.SHOP_ZONE
 import br.vendas.app.ui.common.LoadingBox
+import br.vendas.app.ui.common.UserMessage
+import br.vendas.app.ui.common.UserMessages
+import br.vendas.app.ui.common.friendlyError
 import br.vendas.app.ui.customers.CustomerDetailScreen
 import br.vendas.app.ui.customers.CustomerFormScreen
 import br.vendas.app.ui.customers.CustomerListScreen
 import br.vendas.app.ui.dashboard.DashboardScreen
 import br.vendas.app.ui.design.AppIcons
+import br.vendas.app.ui.design.CardShape
 import br.vendas.app.ui.design.PillShape
 import br.vendas.app.ui.login.LoginScreen
 import br.vendas.app.ui.navigation.CustomerFormRoute
@@ -85,6 +97,7 @@ import br.vendas.app.ui.reports.ReportsScreen
 import br.vendas.app.ui.settings.SettingsScreen
 import br.vendas.app.ui.theme.AppTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -94,11 +107,27 @@ import kotlin.reflect.KClass
 class RootViewModel @Inject constructor(
     private val auth: AuthGateway,
     private val repository: SalesRepository,
+    private val userMessages: UserMessages,
     config: AppConfig,
 ) : ViewModel() {
     val isDemo = config.isDemo
     val authState = auth.state
     val syncStatus = repository.syncStatus
+    val messages = userMessages.messages
+
+    /** Runs the undo here, so it finishes even if the snackbar or the screen that sent it goes away. */
+    fun undo(message: UserMessage) {
+        val undo = message.undo ?: return
+        viewModelScope.launch {
+            val result = try {
+                undo()
+                message.undoneText
+            } catch (e: Exception) {
+                "Não foi possível desfazer: ${friendlyError(e)}"
+            }
+            result?.let { userMessages.show(UserMessage(it)) }
+        }
+    }
 
     fun signOut() {
         viewModelScope.launch {
@@ -136,6 +165,19 @@ private fun MainNavigation(root: RootViewModel) {
     val destination = backStack?.destination
     val syncStatus by root.syncStatus.collectAsStateWithLifecycle()
     val signOut: (() -> Unit)? = if (root.isDemo) null else root::signOut
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        // A new message replaces the one on screen.
+        root.messages.collectLatest { message ->
+            val result = snackbarHostState.showSnackbar(
+                message = message.text,
+                actionLabel = if (message.undo != null) "Desfazer" else null,
+                duration = if (message.undo != null) SnackbarDuration.Long else SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) root.undo(message)
+        }
+    }
 
     Scaffold(
         containerColor = AppTheme.colors.canvas,
@@ -222,12 +264,25 @@ private fun MainNavigation(root: RootViewModel) {
 
             val showNavBar = TOP_LEVEL.any { destination.isOn(it.routeClass) } &&
                 !(destination.isOn(CustomersRoute::class) && backStack?.toRoute<CustomersRoute>()?.overdueOnly == true)
-            if (showNavBar) {
-                FloatingNavBar(
-                    destination = destination,
-                    onSelect = { navController.navigateTopLevel(it.route) },
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                )
+            // Bottom of the screen, from top to bottom: messages, navigation bar.
+            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+                SnackbarHost(snackbarHostState) { data ->
+                    Snackbar(
+                        snackbarData = data,
+                        shape = CardShape,
+                        containerColor = AppTheme.colors.inverseCard,
+                        contentColor = AppTheme.colors.onInverseCard,
+                        actionColor = AppTheme.colors.onInverseCard,
+                    )
+                }
+                if (showNavBar) {
+                    FloatingNavBar(
+                        destination = destination,
+                        onSelect = { navController.navigateTopLevel(it.route) },
+                    )
+                } else {
+                    Spacer(Modifier.navigationBarsPadding())
+                }
             }
         }
     }

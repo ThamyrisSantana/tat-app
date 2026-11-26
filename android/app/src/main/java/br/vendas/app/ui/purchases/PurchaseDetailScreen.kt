@@ -63,6 +63,8 @@ import br.vendas.app.ui.design.Tone
 import br.vendas.app.ui.navigation.PurchaseRoute
 import br.vendas.app.ui.payments.PaymentContext
 import br.vendas.app.ui.payments.PaymentSheet
+import br.vendas.app.ui.payments.paymentRegisteredMessage
+import br.vendas.app.ui.common.UserMessages
 import br.vendas.app.ui.theme.AppTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
@@ -79,6 +81,7 @@ data class PurchaseDetail(
 @HiltViewModel
 class PurchaseDetailViewModel @Inject constructor(
     private val repository: SalesRepository,
+    private val messages: UserMessages,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val purchaseId = savedStateHandle.toRoute<PurchaseRoute>().purchaseId
@@ -115,10 +118,11 @@ class PurchaseDetailViewModel @Inject constructor(
     fun registerPayment(amount: Money, paidOn: LocalDate, notes: String?) {
         val context = paymentContext ?: return
         act {
-            repository.registerPayment(
+            val paymentId = repository.registerPayment(
                 NewPayment(context.customerId, amount, paidOn, context.purchaseId, context.installmentId, notes),
             )
             paymentContext = null
+            messages.show(paymentRegisteredMessage(repository, paymentId, amount))
         }
     }
 

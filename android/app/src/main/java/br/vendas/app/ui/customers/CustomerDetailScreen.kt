@@ -84,6 +84,8 @@ import br.vendas.app.ui.design.Tone
 import br.vendas.app.ui.navigation.CustomerRoute
 import br.vendas.app.ui.payments.PaymentContext
 import br.vendas.app.ui.payments.PaymentSheet
+import br.vendas.app.ui.payments.paymentRegisteredMessage
+import br.vendas.app.ui.common.UserMessages
 import br.vendas.app.ui.theme.AppTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
@@ -103,6 +105,7 @@ data class CustomerDetail(
 @HiltViewModel
 class CustomerDetailViewModel @Inject constructor(
     private val repository: SalesRepository,
+    private val messages: UserMessages,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val customerId = savedStateHandle.toRoute<CustomerRoute>().customerId
@@ -131,7 +134,8 @@ class CustomerDetailViewModel @Inject constructor(
     }
 
     fun registerPayment(amount: Money, paidOn: LocalDate, notes: String?) = act(closeSheet = true) {
-        repository.registerPayment(NewPayment(customerId, amount, paidOn, notes = notes))
+        val paymentId = repository.registerPayment(NewPayment(customerId, amount, paidOn, notes = notes))
+        messages.show(paymentRegisteredMessage(repository, paymentId, amount))
     }
 
     fun deletePayment(payment: Payment) = act(closeSheet = false) { repository.deletePayment(payment.id) }

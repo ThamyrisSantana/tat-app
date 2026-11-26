@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import br.vendas.app.data.SalesRepository
 import br.vendas.app.data.SalesSnapshot
 import br.vendas.app.domain.AllocationCandidate
 import br.vendas.app.domain.Money
@@ -32,6 +33,7 @@ import br.vendas.app.domain.PaymentAllocator
 import br.vendas.app.domain.PaymentExceedsOpenAmountException
 import br.vendas.app.domain.sum
 import br.vendas.app.ui.common.DateField
+import br.vendas.app.ui.common.UserMessage
 import br.vendas.app.ui.common.formatShort
 import br.vendas.app.ui.design.fieldColors
 import br.vendas.app.ui.design.FieldShape
@@ -231,3 +233,10 @@ fun PaymentSheet(
         }
     }
 }
+
+/** "Pagamento registrado · Desfazer": undoing deletes the payment, so its installments are open again. */
+fun paymentRegisteredMessage(repository: SalesRepository, paymentId: String, amount: Money) = UserMessage(
+    text = "Pagamento de ${amount.format()} registrado.",
+    undoneText = "Pagamento desfeito.",
+    undo = { repository.deletePayment(paymentId) },
+)
