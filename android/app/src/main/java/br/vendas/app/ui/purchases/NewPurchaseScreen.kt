@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
@@ -131,6 +132,33 @@ class NewPurchaseViewModel @Inject constructor(
     fun add(product: Product) {
         val index = cart.indexOfFirst { it.product.id == product.id }
         if (index >= 0) cart[index] = cart[index].copy(quantity = cart[index].quantity + 1) else cart += CartItem(product, 1)
+    }
+
+    var creatingProduct by mutableStateOf(false)
+        private set
+    var createProductError by mutableStateOf<String?>(null)
+        private set
+
+    /** Creates a product from the picker and adds it to the cart; [onDone] closes the picker. */
+    fun createProductAndAdd(name: String, price: Money, onDone: () -> Unit) {
+        creatingProduct = true
+        createProductError = null
+        viewModelScope.launch {
+            try {
+                val product = repository.createProduct(name, price)
+                products = repository.products()
+                add(product)
+                onDone()
+            } catch (e: Exception) {
+                createProductError = friendlyError(e)
+            } finally {
+                creatingProduct = false
+            }
+        }
+    }
+
+    fun clearCreateProductError() {
+        createProductError = null
     }
 
     fun changeQuantity(item: CartItem, delta: Int) {
@@ -265,6 +293,10 @@ fun NewPurchaseScreen(
                 viewModel.add(it)
                 picking = false
             },
+            creating = viewModel.creatingProduct,
+            createError = viewModel.createProductError,
+            onCreate = { name, price -> viewModel.createProductAndAdd(name, price) { picking = false } },
+            onClearCreateError = viewModel::clearCreateProductError,
             onDismiss = { picking = false },
         )
     }
@@ -320,43 +352,137 @@ private fun InstallmentOptions(viewModel: NewPurchaseViewModel) {
     }
 }
 
+/**
+ * Lets the user pick a product for the purchase or, when it is not in the
+ * list, register it right here (name and price) and add it to the cart.
+ */
 @Composable
-private fun ProductPicker(products: List<Product>, onPick: (Product) -> Unit, onDismiss: () -> Unit) {
+private fun ProductPicker(
+    products: List<Product>,
+    onPick: (Product) -> Unit,
+    creating: Boolean,
+    createError: String?,
+    onCreate: (name: String, price: Money) -> Unit,
+    onClearCreateError: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     var query by remember { mutableStateOf("") }
+    // Non-null while the dialog shows the "new product" form, holding the name to start with.
+    var newProductName by remember { mutableStateOf<String?>(null) }
+    var newProductPrice by remember { mutableStateOf("") }
+    var formError by remember { mutableStateOf<String?>(null) }
+
     val visible = products.filter { it.name.contains(query.trim(), ignoreCase = true) }
+    val creatingName = newProductName
+
+    fun startCreating() {
+        onClearCreateError()
+        formError = null
+        newProductPrice = ""
+        newProductName = query.trim().replaceFirstChar { it.uppercase() }
+    }
+
+    fun save(name: String) {
+        val price = Money.parse(newProductPrice)
+        formError = when {
+            name.isBlank() -> "Informe o nome."
+            price == null || price <= Money.ZERO -> "Preço inválido. Ex.: 59,90"
+            else -> null
+        }
+        if (formError == null && price != null) onCreate(name.trim(), price)
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = AppTheme.colors.card,
-        title = { Text("Escolha o produto") },
+        title = { Text(if (creatingName == null) "Escolha o produto" else "Novo produto") },
         text = {
-            Column {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    placeholder = { Text("Buscar") },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (query.isNotEmpty()) {
-                            IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, contentDescription = "Limpar") }
+            if (creatingName == null) {
+                Column {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = { Text("Buscar") },
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (query.isNotEmpty()) {
+                                IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, contentDescription = "Limpar") }
+                            }
+                        },
+                        singleLine = true,
+                    )
+                    if (visible.isEmpty()) {
+                        Text(
+                            if (products.isEmpty()) "Nenhum produto cadastrado ainda." else "Nenhum produto encontrado.",
+                            color = AppTheme.colors.muted,
+                            modifier = Modifier.padding(top = 16.dp),
+                        )
+                    }
+                    LazyColumn(Modifier.heightIn(max = 320.dp).padding(top = 8.dp)) {
+                        items(visible, key = { it.id }) { product ->
+                            Row(Modifier.fillMaxWidth().clickable { onPick(product) }.padding(vertical = 14.dp)) {
+                                Text(product.name, color = AppTheme.colors.ink, modifier = Modifier.weight(1f))
+                                Text(product.price.format(), color = AppTheme.colors.ink)
+                            }
+                            RowDivider()
                         }
-                    },
-                    singleLine = true,
-                )
-                if (products.isEmpty()) {
-                    Text("Nenhum produto cadastrado. Cadastre na aba Produtos.", modifier = Modifier.padding(top = 16.dp))
+                    }
+                    val exactMatch = products.any { it.name.equals(query.trim(), ignoreCase = true) }
+                    PrimaryButton(
+                        text = if (query.isNotBlank() && !exactMatch) {
+                            "Cadastrar \"${query.trim().replaceFirstChar { it.uppercase() }}\""
+                        } else {
+                            "Novo produto"
+                        },
+                        icon = Icons.Filled.Add,
+                        onClick = ::startCreating,
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    )
                 }
-                LazyColumn(Modifier.heightIn(max = 360.dp).padding(top = 8.dp)) {
-                    items(visible, key = { it.id }) { product ->
-                        Row(Modifier.fillMaxWidth().clickable { onPick(product) }.padding(vertical = 14.dp)) {
-                            Text(product.name, color = AppTheme.colors.ink, modifier = Modifier.weight(1f))
-                            Text(product.price.format(), color = AppTheme.colors.ink)
-                        }
-                        RowDivider()
+            } else {
+                Column {
+                    OutlinedTextField(
+                        value = creatingName,
+                        onValueChange = { newProductName = it },
+                        label = { Text("Nome") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    )
+                    OutlinedTextField(
+                        value = newProductPrice,
+                        onValueChange = { newProductPrice = it },
+                        label = { Text("Preço (R$)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    Text(
+                        "O produto fica salvo na lista de produtos e entra nesta compra.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppTheme.colors.muted,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    (formError ?: createError)?.let {
+                        Text(it, color = AppTheme.colors.dangerText, modifier = Modifier.padding(top = 8.dp))
                     }
                 }
             }
         },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Fechar", color = AppTheme.colors.ink) } },
+        confirmButton = {
+            if (creatingName != null) {
+                TextButton(onClick = { save(creatingName) }, enabled = !creating) {
+                    Text(if (creating) "Salvando..." else "Salvar e adicionar", color = AppTheme.colors.ink)
+                }
+            }
+        },
+        dismissButton = {
+            if (creatingName != null) {
+                TextButton(onClick = { newProductName = null }, enabled = !creating) {
+                    Text("Voltar", color = AppTheme.colors.muted)
+                }
+            } else {
+                TextButton(onClick = onDismiss) { Text("Fechar", color = AppTheme.colors.ink) }
+            }
+        },
     )
 }

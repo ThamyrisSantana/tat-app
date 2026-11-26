@@ -116,6 +116,21 @@ class AppFlowTest {
     }
 
     @Test
+    fun productMissingFromThePickerCanBeCreatedAndAdded() {
+        openCustomer("Ana Lima")
+        compose.onNodeWithText("Compra").performClick()
+        compose.onNodeWithText("Adicionar produto").performClick()
+        compose.onNodeWithText("Buscar").performTextInput("blusa")
+        compose.onNodeWithText("Nenhum produto encontrado.").assertIsDisplayed()
+
+        compose.onNodeWithText("Cadastrar \"Blusa\"").performClick()
+        compose.onNodeWithText("Preço (R$)").performTextInput("49,90")
+        compose.onNodeWithText("Salvar e adicionar").performClick()
+
+        waitForText("R$ 49,90 cada · R$ 49,90")
+    }
+
+    @Test
     fun reportsShowSalesAndTopProducts() {
         compose.onNodeWithContentDescription("Relatórios").performClick()
         waitForText("Vendas por mês")
