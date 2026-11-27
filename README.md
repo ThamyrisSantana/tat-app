@@ -45,6 +45,7 @@ android/                      Android app
   app/src/androidTest/        UI tests (always run on sample data)
   app/schemas/                Room schema history
 supabase/migrations/          Database schema, balance view, RLS and functions
+supabase/tests/               Access-rule tests: the migrations on an in-process Postgres
 ```
 
 ## How data flows
@@ -61,9 +62,9 @@ Without Supabase settings the app runs in **demo mode**: sample customers and pu
 ## Connecting to Supabase
 
 1. Create a project at [supabase.com](https://supabase.com) (region South America, São Paulo).
-2. Open **SQL Editor** and run each file in `supabase/migrations/` in name order, one at a time: first `20261125000000_initial_schema.sql`, then `20261126000000_flexible_payments.sql`.
-3. In **Authentication → Users**, add the user (e-mail and password) who will use the app, with **Auto Confirm User** checked. There is no sign-up screen in the app.
-4. In **Authentication → Sign In / Providers**, turn off **Allow new users to sign up**. Every signed-in user can read and write all data, so nobody else may be able to create an account with the public key.
+2. Open **SQL Editor** and run each file in `supabase/migrations/` in name order, one at a time: `20261125000000_initial_schema.sql`, `20261126000000_flexible_payments.sql`, then `20261127000000_per_seller_data.sql`.
+3. In **Authentication → Users**, add one user (e-mail and password) per seller, with **Auto Confirm User** checked. Each seller sees only her own customers, products, sales and payments. There is no sign-up screen in the app.
+4. In **Authentication → Sign In / Providers**, turn off **Allow new users to sign up**, so accounts exist only when you create them.
 5. In **Project Settings → API Keys**, copy the project URL and the `anon` public key (tab **Legacy API keys**) into `android/local.properties`:
 
    ```properties
@@ -73,7 +74,22 @@ Without Supabase settings the app runs in **demo mode**: sample customers and pu
 
 6. Build again. The app now asks for the e-mail and password.
 
-`local.properties` is not committed. The anon key is safe in the app because every table is protected by row level security: only signed-in users can read or write. The bot tables (`authorized_senders`, `whatsapp_messages`, `bot_conversations`) have RLS on and no policies, so only the service role used by the future webhook can reach them.
+**Projects created before 2026-11-27** ran only the first two migrations: run `20261127000000_per_seller_data.sql` once in the SQL Editor. The data that already exists goes to the oldest account in **Authentication → Users**.
+
+`local.properties` is not committed. The public key is safe in the app because every table is protected by row level security:
+
+- Every row has an `owner_id`. A signed-in seller reads and writes only rows whose `owner_id` is her own account; without signing in nothing can be read.
+- Items, installments, payments and allocations carry the owner of their purchase or customer, and composite foreign keys keep them equal, so a sale can never point to another seller's customer or product.
+- The database functions take the owner from the customer, so the future WhatsApp bot (service role) records each sale for the right seller.
+- The bot tables (`authorized_senders`, `whatsapp_messages`, `bot_conversations`) have RLS on and no policies, so only the service role used by the webhook can reach them.
+
+`supabase/tests/` runs the migrations on [PGlite](https://pglite.dev) (Postgres in WebAssembly, no server needed) with a stand-in for Supabase's auth schema and checks these rules for two sellers, anonymous users and the service role:
+
+```powershell
+cd supabase\tests
+npm install
+npm test
+```
 
 ## Building
 
