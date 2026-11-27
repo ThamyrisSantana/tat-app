@@ -130,16 +130,26 @@ class OfflineFirstRepository @Inject constructor(
      * when a copy exists; other failures (and offline with no copy) are thrown.
      */
     private suspend fun sync(force: Boolean) = syncMutex.withLock {
+        val userId = remote.currentUserId()
+        val saved = dao.syncInfo()
+        // A copy left by another account (e.g. her session expired and someone else signed
+        // in) is wiped before anything reads it, even offline.
+        val belongsToSomeoneElse = saved != null && userId != null && saved.userId != userId
+        if (belongsToSomeoneElse) {
+            dao.clearAll()
+            _syncStatus.value = SyncStatus()
+        }
+
         val now = System.currentTimeMillis()
-        if (!force && now - lastAttemptMs < STALE_AFTER_MS) return@withLock
+        if (!force && !belongsToSomeoneElse && now - lastAttemptMs < STALE_AFTER_MS) return@withLock
         lastAttemptMs = now
 
-        val lastSynced = dao.syncInfo()?.lastSyncedAt?.let(Instant::parse)
+        val lastSynced = if (belongsToSomeoneElse) null else saved?.lastSyncedAt?.let(Instant::parse)
         try {
             val fresh = remote.fetchSnapshot()
             val syncedAt = Instant.now()
             val before = if (lastSynced != null) dao.load().toSnapshot() else null
-            dao.replaceAll(fresh.toLocalData(), SyncInfoEntity(lastSyncedAt = syncedAt.toString()))
+            dao.replaceAll(fresh.toLocalData(), SyncInfoEntity(lastSyncedAt = syncedAt.toString(), userId = userId))
             _syncStatus.value = SyncStatus(offline = false, lastSyncedAt = syncedAt)
             // Someone else (another phone, the bot) changed the data: reload open screens.
             if (before != null && before != fresh) _changes.update { it + 1 }

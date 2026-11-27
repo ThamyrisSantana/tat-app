@@ -18,7 +18,7 @@ import androidx.room.RoomDatabase
         PaymentAllocationEntity::class,
         SyncInfoEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

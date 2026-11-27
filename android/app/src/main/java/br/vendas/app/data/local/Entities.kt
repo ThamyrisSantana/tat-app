@@ -83,4 +83,6 @@ data class PaymentAllocationEntity(
 data class SyncInfoEntity(
     @PrimaryKey val id: Int = 0,
     @ColumnInfo(name = "last_synced_at") val lastSyncedAt: String,
+    /** Account the copy belongs to: another account signing in must never see it. */
+    @ColumnInfo(name = "user_id") val userId: String?,
 )

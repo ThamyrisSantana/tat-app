@@ -12,6 +12,7 @@ import br.vendas.app.domain.NewPurchase
 import br.vendas.app.domain.PaymentExceedsOpenAmountException
 import br.vendas.app.domain.Product
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.exception.PostgrestRestException
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
@@ -28,7 +29,10 @@ private const val UNIQUE_VIOLATION = "23505"
 private const val PAGE_SIZE = 1000L
 private const val PURCHASE_COLUMNS = "*, purchase_items(*, products(name)), installments(*)"
 
-/** Talks to Supabase. Reads the whole data set for the local copy; writes one change at a time. */
+/**
+ * Talks to Supabase. Reads the signed-in seller's whole data set for the local copy (the
+ * database's access rules leave out other sellers' rows); writes one change at a time.
+ */
 class SupabaseRemoteDataSource @Inject constructor(private val client: SupabaseClient) {
 
     /** Everything the app shows. Paged, since PostgREST returns at most 1000 rows per request. */
@@ -39,6 +43,9 @@ class SupabaseRemoteDataSource @Inject constructor(private val client: SupabaseC
         payments = fetchAll<PaymentDto>("payments", Columns.raw("*, payment_allocations(installment_id, amount)"))
             .map { it.toDomain() },
     )
+
+    /** The signed-in account, or null when there is no saved session. */
+    fun currentUserId(): String? = client.auth.currentSessionOrNull()?.user?.id
 
     suspend fun createCustomer(input: CustomerInput): Customer {
         ensurePhoneFree(input.phone, exceptId = null)

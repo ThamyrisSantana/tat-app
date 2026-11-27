@@ -53,7 +53,7 @@ supabase/tests/               Access-rule tests: the migrations on an in-process
 - **Reads** come from the copy saved on the phone (Room). It is refreshed from Supabase when older than 15 seconds, after every change, and on pull to refresh.
 - **Without internet** the saved copy is shown and a red banner says when it was last updated. Changes need internet and fail with a clear message.
 - **Writes** go to Supabase first; the local copy is then refreshed. Purchases are created by the `public.create_purchase` database function, which saves the purchase, its items and its installments in one transaction and is the source of truth for installment amounts and due dates (`InstallmentPlan.kt` mirrors it for the on-screen preview and demo mode).
-- **Signing out** deletes the local copy.
+- **Signing out** deletes the local copy. The copy also records which account it belongs to, so if a different account signs in on the same phone (after a session expired, say) the old copy is wiped before anything is shown.
 
 ## Demo mode
 
